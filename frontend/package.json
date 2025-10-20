@@ -52,6 +52,11 @@
           "type": "string",
           "description": "Your API Key for Code Improver"
         },
+        "codeImprover.model": {
+          "type": "string",
+          "default": "gpt-3.5-turbo",
+          "description": "AI model to use for code analysis"
+        },
         "codeImprover.autoAnalyze": {
           "type": "boolean",
           "default": false,

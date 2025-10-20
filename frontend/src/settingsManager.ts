@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 export interface ExtensionSettings {
   backendUrl: string;
   apiKey?: string;
+  model: string;
   autoAnalyze: boolean;
   excludedPatterns: string[];
   includedLanguages: string[];
@@ -29,6 +30,7 @@ export class SettingsManager {
     return {
       backendUrl: this.configuration.get<string>('backendUrl') || 'http://localhost:3006',
       apiKey: this.configuration.get<string>('apiKey'),
+      model: this.configuration.get<string>('model') || 'gpt-3.5-turbo',
       autoAnalyze: this.configuration.get<boolean>('autoAnalyze') || false,
       excludedPatterns: this.configuration.get<string[]>('excludedPatterns') || [
         '**/node_modules/**',
@@ -94,6 +96,7 @@ export class SettingsManager {
     return {
       backendUrl: 'http://localhost:3006',
       apiKey: undefined,
+      model: 'gpt-3.5-turbo',
       autoAnalyze: false,
       excludedPatterns: [
         '**/node_modules/**',
@@ -124,5 +127,9 @@ export class SettingsManager {
 
   getAutoAnalyze(): boolean {
     return this.getSettings().autoAnalyze;
+  }
+
+  getModel(): string {
+    return this.getSettings().model;
   }
 }

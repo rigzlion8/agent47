@@ -67,6 +67,9 @@ export class ChatPanel {
           case 'getCodeContext':
             await this.sendCodeContext();
             break;
+          case 'openSettings':
+            await vscode.commands.executeCommand('code-improver.openSettings');
+            break;
         }
       },
       null,
@@ -189,6 +192,34 @@ You can also select code in your editor and ask me about it directly!`,
           <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' ${this.panel.webview.cspSource}; script-src 'nonce-${nonce}';">
           <title>AI Assistant</title>
           <style>
+            .header {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              padding: 12px 16px;
+              border-bottom: 1px solid var(--vscode-panel-border);
+              background: var(--vscode-panel-background);
+            }
+            
+            .header-title {
+              font-weight: bold;
+              font-size: var(--vscode-font-size);
+              color: var(--vscode-foreground);
+            }
+            
+            .settings-button {
+              background: none;
+              border: none;
+              cursor: pointer;
+              font-size: 16px;
+              padding: 4px;
+              border-radius: 4px;
+            }
+            
+            .settings-button:hover {
+              background: var(--vscode-toolbar-hoverBackground);
+            }
+            
             body {
               font-family: var(--vscode-font-family);
               font-size: var(--vscode-font-size);
@@ -330,6 +361,14 @@ You can also select code in your editor and ask me about it directly!`,
           </style>
       </head>
       <body>
+        <div class="header">
+          <div class="header-title">CODE IMPROVER: AI ASSISTANT</div>
+          <div class="header-actions">
+            <button id="settingsButton" class="settings-button" title="Open Settings">
+              ⚙️
+            </button>
+          </div>
+        </div>
         <div class="chat-container">
           <div class="messages" id="messages">
             ${this.messages.map(message => `
@@ -370,6 +409,7 @@ You can also select code in your editor and ask me about it directly!`,
           const messageInput = document.getElementById('messageInput');
           const sendButton = document.getElementById('sendButton');
           const clearButton = document.getElementById('clearButton');
+          const settingsButton = document.getElementById('settingsButton');
           
           // Auto-scroll to bottom
           function scrollToBottom() {
@@ -409,9 +449,17 @@ You can also select code in your editor and ask me about it directly!`,
             vscode.postMessage({ command: 'clearChat' });
           }
           
+          // Open settings
+          function openSettings() {
+            vscode.postMessage({ command: 'openSettings' });
+          }
+          
           // Event listeners
           sendButton.addEventListener('click', sendMessage);
           clearButton.addEventListener('click', clearChat);
+          if (settingsButton) {
+            settingsButton.addEventListener('click', openSettings);
+          }
           
           messageInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {

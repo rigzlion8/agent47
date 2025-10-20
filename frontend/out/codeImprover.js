@@ -73,6 +73,7 @@ class CodeImprover {
                         vscode.window.showErrorMessage('API key not configured. Please set it in settings.');
                         return;
                     }
+                    const headers = this.getAuthHeaders(backendUrl, apiKey);
                     const response = await axios_1.default.post(`${backendUrl}/api/code/analyze`, {
                         code,
                         language,
@@ -81,9 +82,7 @@ class CodeImprover {
                             framework: this.detectFramework(document)
                         }
                     }, {
-                        headers: {
-                            'Authorization': `Bearer ${apiKey}`
-                        }
+                        headers
                     });
                     const { analysisId, status } = response.data;
                     if (status === 'queued') {
@@ -114,8 +113,8 @@ class CodeImprover {
         vscode.window.showInformationMessage('Project analysis feature coming soon!');
     }
     async openSettings() {
-        // This would open a settings webview
-        vscode.window.showInformationMessage('Opening settings...');
+        // Open VS Code settings for this extension
+        await vscode.commands.executeCommand('workbench.action.openSettings', 'codeImprover');
     }
     detectFramework(document) {
         const fileName = document.fileName.toLowerCase();
@@ -137,10 +136,9 @@ class CodeImprover {
         const delay = 1000; // 1 second between attempts
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
             try {
+                const headers = this.getAuthHeaders(backendUrl, apiKey);
                 const response = await axios_1.default.get(`${backendUrl}/api/code/analysis/${analysisId}`, {
-                    headers: {
-                        'Authorization': `Bearer ${apiKey}`
-                    }
+                    headers
                 });
                 const { status, suggestions } = response.data;
                 if (status === 'completed') {
@@ -160,6 +158,42 @@ class CodeImprover {
         }
         vscode.window.showWarningMessage('Analysis timed out');
         return null;
+    }
+    getAuthHeaders(backendUrl, apiKey) {
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        if (!apiKey) {
+            console.warn('No API key provided for authentication');
+            return headers;
+        }
+        // Debug logging for authentication
+        console.log('AuthHeaders - Backend URL:', backendUrl);
+        console.log('AuthHeaders - API Key length:', apiKey.length);
+        // Handle different authentication schemes based on backend URL
+        if (backendUrl.includes('edenai.run') || backendUrl.includes('edenai')) {
+            // Eden AI uses lowercase 'authorization' header for JavaScript/Node.js
+            console.log('AuthHeaders - Using Eden AI Bearer token authentication (lowercase header)');
+            headers['authorization'] = `Bearer ${apiKey}`;
+        }
+        else if (backendUrl.includes('openai.com')) {
+            // OpenAI uses Bearer tokens
+            console.log('AuthHeaders - Using OpenAI Bearer token authentication');
+            headers['Authorization'] = `Bearer ${apiKey}`;
+        }
+        else if (backendUrl.includes('anthropic.com')) {
+            // Anthropic uses x-api-key header
+            console.log('AuthHeaders - Using Anthropic x-api-key authentication');
+            headers['x-api-key'] = apiKey;
+            headers['anthropic-version'] = '2023-06-01';
+        }
+        else {
+            // Default to Bearer token for custom backends
+            console.log('AuthHeaders - Using default Bearer token authentication');
+            headers['Authorization'] = `Bearer ${apiKey}`;
+        }
+        console.log('AuthHeaders - Final headers:', Object.keys(headers));
+        return headers;
     }
     displaySuggestions(suggestions, editor) {
         // Display suggestions in the editor

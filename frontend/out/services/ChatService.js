@@ -36,6 +36,13 @@ class ChatService {
     async sendMessage(message, context) {
         const backendUrl = this.settingsManager.getBackendUrl();
         const apiKey = this.settingsManager.getApiKey();
+        // Debug logging for API key and backend URL
+        console.log('ChatService - Backend URL:', backendUrl);
+        console.log('ChatService - API Key present:', !!apiKey);
+        if (apiKey) {
+            console.log('ChatService - API Key length:', apiKey.length);
+            console.log('ChatService - API Key starts with:', apiKey.substring(0, 4) + '...');
+        }
         if (!apiKey) {
             // For development, allow requests without API key but show a warning
             console.warn('API key not configured. Some features may not work properly.');
@@ -45,16 +52,14 @@ class ChatService {
             // Get additional context from active editor if available
             const editorContext = await this.getEditorContext();
             const fullContext = { ...context, ...editorContext };
+            const headers = this.getAuthHeaders(backendUrl, apiKey);
             const response = await axios_1.default.post(`${backendUrl}/api/code/analyze`, {
                 code: message,
                 language: fullContext.language || 'typescript',
                 filePath: fullContext.filePath,
                 context: fullContext
             }, {
-                headers: {
-                    'Authorization': `Bearer ${apiKey}`,
-                    'Content-Type': 'application/json'
-                },
+                headers,
                 timeout: 30000 // 30 second timeout
             });
             if (response.data && response.data.analysisId) {
@@ -71,8 +76,8 @@ class ChatService {
                 throw new Error('Unable to connect to the analysis service. Please check if the backend server is running.');
             }
             else if (error.response?.status === 401) {
-                // Authentication error - provide a helpful message
-                return "I can see the backend server is running, but authentication is required. For development, you might need to set up authentication or use a development API key.";
+                // Authentication error - provide a helpful message with guidance
+                return "I can see the backend server is running, but authentication is required. Please configure your API key in the Code Improver settings:\n\n1. Open Command Palette (Ctrl+Shift+P / Cmd+Shift+P)\n2. Search for 'Code Improver: Open Settings'\n3. Enter your API key in the 'API Key' field\n4. Save the settings\n\nFor development, you might need to set up authentication or use a development API key.";
             }
             else if (error.response?.status === 404) {
                 throw new Error('Analysis endpoint not found. Please check the backend configuration.');
@@ -135,6 +140,42 @@ class ChatService {
             language,
             ...context
         });
+    }
+    getAuthHeaders(backendUrl, apiKey) {
+        const headers = {
+            'Content-Type': 'application/json'
+        };
+        if (!apiKey) {
+            console.warn('No API key provided for authentication');
+            return headers;
+        }
+        // Debug logging for authentication
+        console.log('AuthHeaders - Backend URL:', backendUrl);
+        console.log('AuthHeaders - API Key length:', apiKey.length);
+        // Handle different authentication schemes based on backend URL
+        if (backendUrl.includes('edenai.run') || backendUrl.includes('edenai')) {
+            // Eden AI uses lowercase 'authorization' header for JavaScript/Node.js
+            console.log('AuthHeaders - Using Eden AI Bearer token authentication (lowercase header)');
+            headers['authorization'] = `Bearer ${apiKey}`;
+        }
+        else if (backendUrl.includes('openai.com')) {
+            // OpenAI uses Bearer tokens
+            console.log('AuthHeaders - Using OpenAI Bearer token authentication');
+            headers['Authorization'] = `Bearer ${apiKey}`;
+        }
+        else if (backendUrl.includes('anthropic.com')) {
+            // Anthropic uses x-api-key header
+            console.log('AuthHeaders - Using Anthropic x-api-key authentication');
+            headers['x-api-key'] = apiKey;
+            headers['anthropic-version'] = '2023-06-01';
+        }
+        else {
+            // Default to Bearer token for custom backends
+            console.log('AuthHeaders - Using default Bearer token authentication');
+            headers['Authorization'] = `Bearer ${apiKey}`;
+        }
+        console.log('AuthHeaders - Final headers:', Object.keys(headers));
+        return headers;
     }
     dispose() {
         // Clean up any resources if needed

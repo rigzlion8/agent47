@@ -40,6 +40,7 @@ class SettingsManager {
         return {
             backendUrl: this.configuration.get('backendUrl') || 'http://localhost:3006',
             apiKey: this.configuration.get('apiKey'),
+            model: this.configuration.get('model') || 'gpt-3.5-turbo',
             autoAnalyze: this.configuration.get('autoAnalyze') || false,
             excludedPatterns: this.configuration.get('excludedPatterns') || [
                 '**/node_modules/**',
@@ -94,6 +95,7 @@ class SettingsManager {
         return {
             backendUrl: 'http://localhost:3006',
             apiKey: undefined,
+            model: 'gpt-3.5-turbo',
             autoAnalyze: false,
             excludedPatterns: [
                 '**/node_modules/**',
@@ -121,6 +123,9 @@ class SettingsManager {
     }
     getAutoAnalyze() {
         return this.getSettings().autoAnalyze;
+    }
+    getModel() {
+        return this.getSettings().model;
     }
 }
 exports.SettingsManager = SettingsManager;
