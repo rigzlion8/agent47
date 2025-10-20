@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* VS Code theme integration */
+:root {
+  --vscode-font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  --vscode-foreground: #cccccc;
+  --vscode-background: #1e1e1e;
+  --vscode-button-background: #0e639c;
+  --vscode-button-foreground: #ffffff;
+}
+
+body {
+  font-family: var(--vscode-font-family);
+  color: var(--vscode-foreground);
+  background-color: var(--vscode-background);
+}
+
+/* Custom components */
+@layer components {
+  .btn-primary {
+    @apply px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors;
+  }
+  
+  .btn-secondary {
+    @apply px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors;
+  }
+  
+  .suggestion-card {
+    @apply border rounded-lg p-4 mb-4 shadow-sm;
+  }
+  
+  .severity-badge {
+    @apply inline-block px-2 py-1 text-xs font-semibold rounded;
+  }
+  
+  .severity-high {
+    @apply bg-red-500 text-white;
+  }
+  
+  .severity-medium {
+    @apply bg-yellow-500 text-black;
+  }
+  
+  .severity-low {
+    @apply bg-green-500 text-white;
+  }
+  
+  .category-tag {
+    @apply inline-block px-2 py-1 text-xs rounded-full font-medium;
+  }
+  
+  .code-block {
+    @apply font-mono text-sm bg-gray-800 rounded p-3 overflow-x-auto;
+  }
+}
