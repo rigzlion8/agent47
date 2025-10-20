@@ -26,6 +26,18 @@
       {
         "command": "code-improver.openSettings",
         "title": "Open Settings"
+      },
+      {
+        "command": "code-improver.openChat",
+        "title": "Open AI Assistant"
+      },
+      {
+        "command": "code-improver.explainCode",
+        "title": "Explain Selected Code"
+      },
+      {
+        "command": "code-improver.improveCode",
+        "title": "Improve Selected Code"
       }
     ],
     "configuration": {
@@ -46,6 +58,52 @@
           "description": "Automatically analyze files on save"
         }
       }
+    },
+    "menus": {
+      "command-palette": [
+        {
+          "command": "code-improver.openChat",
+          "when": "true"
+        },
+        {
+          "command": "code-improver.explainCode",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "code-improver.improveCode",
+          "when": "editorHasSelection"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "code-improver.explainCode",
+          "group": "code-improver",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "code-improver.improveCode",
+          "group": "code-improver",
+          "when": "editorHasSelection"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "code-improver",
+          "title": "Code Improver",
+          "icon": "$(comment-discussion)"
+        }
+      ]
+    },
+    "views": {
+      "code-improver": [
+        {
+          "id": "code-improver-chat",
+          "name": "AI Assistant",
+          "type": "webview"
+        }
+      ]
     }
   },
   "scripts": {

@@ -1,69 +1,73 @@
-import * as vscode from 'vscode';
-import { Suggestion } from '../types/shared';
-
-export class SuggestionPanel {
-  private static currentPanel: SuggestionPanel | undefined;
-  private readonly panel: vscode.WebviewPanel;
-  private disposables: vscode.Disposable[] = [];
-
-  private constructor(panel: vscode.WebviewPanel, extensionUri: vscode.Uri) {
-    this.panel = panel;
-    this.setupWebview(extensionUri);
-  }
-
-  public static createOrShow(extensionUri: vscode.Uri, suggestions: Suggestion[]) {
-    const column = vscode.window.activeTextEditor
-      ? vscode.window.activeTextEditor.viewColumn
-      : undefined;
-
-    if (SuggestionPanel.currentPanel) {
-      SuggestionPanel.currentPanel.panel.reveal(column);
-      SuggestionPanel.currentPanel.update(suggestions);
-      return;
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
     }
-
-    const panel = vscode.window.createWebviewPanel(
-      'codeImprover',
-      'Code Suggestions',
-      column || vscode.ViewColumn.One,
-      {
-        enableScripts: true,
-        localResourceRoots: [extensionUri]
-      }
-    );
-
-    SuggestionPanel.currentPanel = new SuggestionPanel(panel, extensionUri);
-    SuggestionPanel.currentPanel.update(suggestions);
-  }
-
-  private setupWebview(extensionUri: vscode.Uri) {
-    this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
-
-    this.panel.webview.onDidReceiveMessage(
-      async (message) => {
-        switch (message.command) {
-          case 'applySuggestion':
-            await this.applySuggestion(message.suggestion);
-            break;
-          case 'navigateToLine':
-            await this.navigateToLine(message.lineNumber);
-            break;
-          case 'dismissSuggestion':
-            await this.dismissSuggestion(message.suggestionId);
-            break;
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.SuggestionPanel = void 0;
+const vscode = __importStar(require("vscode"));
+class SuggestionPanel {
+    constructor(panel, extensionUri) {
+        this.disposables = [];
+        this.panel = panel;
+        this.setupWebview(extensionUri);
+    }
+    static createOrShow(extensionUri, suggestions) {
+        const column = vscode.window.activeTextEditor
+            ? vscode.window.activeTextEditor.viewColumn
+            : undefined;
+        if (SuggestionPanel.currentPanel) {
+            SuggestionPanel.currentPanel.panel.reveal(column);
+            SuggestionPanel.currentPanel.update(suggestions);
+            return;
         }
-      },
-      null,
-      this.disposables
-    );
-  }
-
-  private async update(suggestions: Suggestion[]) {
-    this.panel.webview.html = this.getWebviewContent(suggestions);
-  }
-
-  private getWebviewContent(suggestions: Suggestion[]): string {
-    return `
+        const panel = vscode.window.createWebviewPanel('codeImprover', 'Code Suggestions', column || vscode.ViewColumn.One, {
+            enableScripts: true,
+            localResourceRoots: [extensionUri]
+        });
+        SuggestionPanel.currentPanel = new SuggestionPanel(panel, extensionUri);
+        SuggestionPanel.currentPanel.update(suggestions);
+    }
+    setupWebview(extensionUri) {
+        this.panel.onDidDispose(() => this.dispose(), null, this.disposables);
+        this.panel.webview.onDidReceiveMessage(async (message) => {
+            switch (message.command) {
+                case 'applySuggestion':
+                    await this.applySuggestion(message.suggestion);
+                    break;
+                case 'navigateToLine':
+                    await this.navigateToLine(message.lineNumber);
+                    break;
+                case 'dismissSuggestion':
+                    await this.dismissSuggestion(message.suggestionId);
+                    break;
+            }
+        }, null, this.disposables);
+    }
+    async update(suggestions) {
+        this.panel.webview.html = this.getWebviewContent(suggestions);
+    }
+    getWebviewContent(suggestions) {
+        return `
       <!DOCTYPE html>
       <html lang="en">
       <head>
@@ -151,9 +155,9 @@ export class SuggestionPanel {
       <body>
         <h2>Code Suggestions (${suggestions.length})</h2>
         
-        ${suggestions.length === 0 
-          ? '<p>No suggestions found. Your code looks great! 🎉</p>' 
-          : suggestions.map(suggestion => `
+        ${suggestions.length === 0
+            ? '<p>No suggestions found. Your code looks great! 🎉</p>'
+            : suggestions.map(suggestion => `
             <div class="suggestion severity-${suggestion.severity}">
               <div class="suggestion-header">
                 <span class="category ${suggestion.category}">${suggestion.category}</span>
@@ -223,44 +227,41 @@ export class SuggestionPanel {
       </body>
       </html>
     `;
-  }
-
-  private async applySuggestion(suggestion: Suggestion) {
-    // Implementation for applying code fixes
-    const editor = vscode.window.activeTextEditor;
-    if (editor && suggestion.before && suggestion.after) {
-      // Find the text and replace it
-      // This is a simplified implementation
-      const document = editor.document;
-      const line = document.lineAt(suggestion.lineNumber - 1);
-      const text = line.text;
-      
-      if (text.includes(suggestion.before)) {
-        const newText = text.replace(suggestion.before, suggestion.after);
-        await editor.edit(editBuilder => {
-          editBuilder.replace(line.range, newText);
-        });
-      }
     }
-  }
-
-  private async navigateToLine(lineNumber: number) {
-    const editor = vscode.window.activeTextEditor;
-    if (editor) {
-      const position = new vscode.Position(lineNumber, 0);
-      editor.selection = new vscode.Selection(position, position);
-      editor.revealRange(new vscode.Range(position, position));
+    async applySuggestion(suggestion) {
+        // Implementation for applying code fixes
+        const editor = vscode.window.activeTextEditor;
+        if (editor && suggestion.before && suggestion.after) {
+            // Find the text and replace it
+            // This is a simplified implementation
+            const document = editor.document;
+            const line = document.lineAt(suggestion.lineNumber - 1);
+            const text = line.text;
+            if (text.includes(suggestion.before)) {
+                const newText = text.replace(suggestion.before, suggestion.after);
+                await editor.edit(editBuilder => {
+                    editBuilder.replace(line.range, newText);
+                });
+            }
+        }
     }
-  }
-
-  private async dismissSuggestion(suggestionId: string) {
-    // Implementation for dismissing suggestions
-    vscode.window.showInformationMessage(`Suggestion ${suggestionId} dismissed`);
-  }
-
-  private dispose() {
-    SuggestionPanel.currentPanel = undefined;
-    this.panel.dispose();
-    this.disposables.forEach(d => d.dispose());
-  }
+    async navigateToLine(lineNumber) {
+        const editor = vscode.window.activeTextEditor;
+        if (editor) {
+            const position = new vscode.Position(lineNumber, 0);
+            editor.selection = new vscode.Selection(position, position);
+            editor.revealRange(new vscode.Range(position, position));
+        }
+    }
+    async dismissSuggestion(suggestionId) {
+        // Implementation for dismissing suggestions
+        vscode.window.showInformationMessage(`Suggestion ${suggestionId} dismissed`);
+    }
+    dispose() {
+        SuggestionPanel.currentPanel = undefined;
+        this.panel.dispose();
+        this.disposables.forEach(d => d.dispose());
+    }
 }
+exports.SuggestionPanel = SuggestionPanel;
+//# sourceMappingURL=SuggestionPanel.js.map

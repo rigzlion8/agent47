@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { Suggestion } from '../../../shared/types';
+import { Suggestion } from '../types/shared';
 
 export class SuggestionDecorator {
   private diagnosticCollection: vscode.DiagnosticCollection;

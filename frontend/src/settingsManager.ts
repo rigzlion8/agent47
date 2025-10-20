@@ -27,7 +27,7 @@ export class SettingsManager {
 
   getSettings(): ExtensionSettings {
     return {
-      backendUrl: this.configuration.get<string>('backendUrl') || 'http://localhost:3000',
+      backendUrl: this.configuration.get<string>('backendUrl') || 'http://localhost:3006',
       apiKey: this.configuration.get<string>('apiKey'),
       autoAnalyze: this.configuration.get<boolean>('autoAnalyze') || false,
       excludedPatterns: this.configuration.get<string[]>('excludedPatterns') || [
@@ -92,7 +92,7 @@ export class SettingsManager {
 
   private getDefaultSettings(): ExtensionSettings {
     return {
-      backendUrl: 'http://localhost:3000',
+      backendUrl: 'http://localhost:3006',
       apiKey: undefined,
       autoAnalyze: false,
       excludedPatterns: [

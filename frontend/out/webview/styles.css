@@ -689,6 +689,10 @@ video {
   max-width: 56rem;
 }
 
+.resize {
+  resize: both;
+}
+
 .items-center {
   align-items: center;
 }
@@ -778,12 +782,24 @@ video {
   font-weight: 600;
 }
 
+.italic {
+  font-style: italic;
+}
+
 .text-vscode-foreground {
   color: var(--vscode-editor-foreground);
 }
 
 .text-vscode-input-foreground {
   color: var(--vscode-input-foreground, #cccccc);
+}
+
+.outline {
+  outline-style: solid;
+}
+
+.filter {
+  filter: var(--tw-blur) var(--tw-brightness) var(--tw-contrast) var(--tw-grayscale) var(--tw-hue-rotate) var(--tw-invert) var(--tw-saturate) var(--tw-sepia) var(--tw-drop-shadow);
 }
 
 /* VS Code theme integration */

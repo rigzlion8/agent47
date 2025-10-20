@@ -1,0 +1,176 @@
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.CodeImprover = void 0;
+const vscode = __importStar(require("vscode"));
+const SuggestionDecorator_1 = require("./services/SuggestionDecorator");
+const SuggestionPanel_1 = require("./views/SuggestionPanel");
+const FileIndexer_1 = require("./services/FileIndexer");
+const axios_1 = __importDefault(require("axios"));
+class CodeImprover {
+    constructor(settingsManager) {
+        this.settingsManager = settingsManager;
+        this.suggestionDecorator = new SuggestionDecorator_1.SuggestionDecorator();
+        // Initialize file indexer with workspace root if available
+        const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+        this.fileIndexer = new FileIndexer_1.FileIndexer(workspaceRoot);
+    }
+    async analyzeCurrentFile() {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            vscode.window.showErrorMessage('No active editor found');
+            return;
+        }
+        // Debug: Check current settings
+        const apiKey = this.settingsManager.getApiKey();
+        console.log('Current API Key from settings:', apiKey ? '***' + apiKey.slice(-4) : 'undefined');
+        console.log('All settings:', this.settingsManager.getSettings());
+        await this.analyzeDocument(editor.document);
+    }
+    async analyzeDocument(document) {
+        try {
+            const code = document.getText();
+            const language = document.languageId;
+            const filePath = document.fileName;
+            if (!code.trim()) {
+                vscode.window.showWarningMessage('File is empty');
+                return;
+            }
+            vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: 'Analyzing code...',
+                cancellable: false
+            }, async (progress) => {
+                try {
+                    const backendUrl = this.settingsManager.getBackendUrl();
+                    const apiKey = this.settingsManager.getApiKey();
+                    if (!apiKey) {
+                        vscode.window.showErrorMessage('API key not configured. Please set it in settings.');
+                        return;
+                    }
+                    const response = await axios_1.default.post(`${backendUrl}/api/code/analyze`, {
+                        code,
+                        language,
+                        filePath,
+                        context: {
+                            framework: this.detectFramework(document)
+                        }
+                    }, {
+                        headers: {
+                            'Authorization': `Bearer ${apiKey}`
+                        }
+                    });
+                    const { analysisId, status } = response.data;
+                    if (status === 'queued') {
+                        vscode.window.showInformationMessage(`Analysis queued (ID: ${analysisId})`);
+                        // Poll for results
+                        const suggestions = await this.pollForResults(analysisId, backendUrl, apiKey);
+                        if (suggestions) {
+                            this.displaySuggestions(suggestions, vscode.window.activeTextEditor);
+                        }
+                    }
+                }
+                catch (error) {
+                    console.error('Analysis error:', error);
+                    vscode.window.showErrorMessage(`Analysis failed: ${error.response?.data?.error || error.message}`);
+                }
+            });
+        }
+        catch (error) {
+            vscode.window.showErrorMessage(`Analysis failed: ${error.message}`);
+        }
+    }
+    async analyzeProject() {
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders) {
+            vscode.window.showErrorMessage('No workspace folder open');
+            return;
+        }
+        vscode.window.showInformationMessage('Project analysis feature coming soon!');
+    }
+    async openSettings() {
+        // This would open a settings webview
+        vscode.window.showInformationMessage('Opening settings...');
+    }
+    detectFramework(document) {
+        const fileName = document.fileName.toLowerCase();
+        const content = document.getText();
+        if (fileName.endsWith('.vue'))
+            return 'vue';
+        if (fileName.endsWith('.svelte'))
+            return 'svelte';
+        if (fileName.includes('angular'))
+            return 'angular';
+        if (fileName.includes('react') || content.includes('React'))
+            return 'react';
+        if (content.includes('@Component') && content.includes('angular'))
+            return 'angular';
+        return undefined;
+    }
+    async pollForResults(analysisId, backendUrl, apiKey) {
+        const maxAttempts = 30; // 30 seconds max
+        const delay = 1000; // 1 second between attempts
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            try {
+                const response = await axios_1.default.get(`${backendUrl}/api/code/analysis/${analysisId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${apiKey}`
+                    }
+                });
+                const { status, suggestions } = response.data;
+                if (status === 'completed') {
+                    return suggestions || [];
+                }
+                else if (status === 'failed') {
+                    vscode.window.showErrorMessage('Analysis failed');
+                    return null;
+                }
+                // Still processing, wait and try again
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+            catch (error) {
+                console.error('Polling error:', error);
+                return null;
+            }
+        }
+        vscode.window.showWarningMessage('Analysis timed out');
+        return null;
+    }
+    displaySuggestions(suggestions, editor) {
+        // Display suggestions in the editor
+        this.suggestionDecorator.displaySuggestions(editor, suggestions);
+        // Show suggestions panel
+        SuggestionPanel_1.SuggestionPanel.createOrShow(vscode.Uri.file(__dirname), suggestions);
+        vscode.window.showInformationMessage(`Found ${suggestions.length} suggestions`);
+    }
+    dispose() {
+        this.suggestionDecorator.dispose();
+    }
+}
+exports.CodeImprover = CodeImprover;
+//# sourceMappingURL=codeImprover.js.map
