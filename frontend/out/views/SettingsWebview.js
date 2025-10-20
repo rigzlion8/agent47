@@ -106,7 +106,7 @@ class SettingsWebview {
                     placeholder="Enter your API key"
                   />
                   <p class="text-xs text-vscode-descriptionForeground mt-1">
-                    For Eden AI, use your API key from <a href="https://app.edenai.run/admin/account" class="text-vscode-textLink-foreground hover:underline" onclick="openEdenAIDocs()">app.edenai.run</a>
+                    For Eden AI, use your API key from <a href="https://docs.edenai.co/" class="text-vscode-textLink-foreground hover:underline" onclick="openEdenAIDocs()">docs.edenai.co</a>
                   </p>
                 </div>
 

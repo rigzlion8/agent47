@@ -45,7 +45,7 @@
       "properties": {
         "codeImprover.backendUrl": {
           "type": "string",
-          "default": "http://localhost:3006",
+          "default": "https://api.edenai.run/v2",
           "description": "Backend API URL"
         },
         "codeImprover.apiKey": {

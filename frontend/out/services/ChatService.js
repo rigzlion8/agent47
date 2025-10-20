@@ -44,10 +44,12 @@ class ChatService {
             console.log('ChatService - API Key length:', apiKey.length);
             console.log('ChatService - API Key starts with:', apiKey.substring(0, 4) + '...');
             console.log('ChatService - API Key ends with:', '...' + apiKey.substring(apiKey.length - 4));
+            console.log('ChatService - API Key value (first 10 chars):', apiKey.substring(0, 10) + '...');
         }
         else {
             console.log('ChatService - NO API KEY FOUND!');
             console.log('ChatService - All settings:', this.settingsManager.getSettings());
+            console.log('ChatService - SettingsManager instance:', this.settingsManager);
         }
         if (!apiKey) {
             // For development, allow requests without API key but show a warning
@@ -76,10 +78,15 @@ class ChatService {
                     filePath: fullContext.filePath,
                     context: fullContext
                 };
+            console.log('ChatService - Making request to:', endpoint);
+            console.log('ChatService - Request headers:', headers);
+            console.log('ChatService - Request payload:', payload);
             const response = await axios_1.default.post(endpoint, payload, {
                 headers,
                 timeout: 30000 // 30 second timeout
             });
+            console.log('ChatService - Response status:', response.status);
+            console.log('ChatService - Response data:', response.data);
             if (backendUrl.includes('edenai.run')) {
                 // Handle Eden AI response format
                 if (response.data && response.data.openai && response.data.openai.generated_text) {
