@@ -49,15 +49,24 @@ export class ChatService {
 
       const headers = this.getAuthHeaders(backendUrl, apiKey);
       
-      // Use Eden AI's text generation endpoint for code analysis
-      const endpoint = backendUrl.includes('edenai.run')
-        ? `${backendUrl}/text/generation`
+      // Use DeepSeek's chat completion endpoint
+      const endpoint = backendUrl.includes('deepseek.com')
+        ? `${backendUrl}/chat/completions`
         : `${backendUrl}/api/code/analyze`;
       
-      const payload = backendUrl.includes('edenai.run')
+      const payload = backendUrl.includes('deepseek.com')
         ? {
-            providers: ['openai'],
-            text: `Please analyze this ${fullContext.language || 'typescript'} code:\n\n${message}\n\nProvide code analysis, suggestions, and improvements.`,
+            model: 'deepseek-chat',
+            messages: [
+              {
+                role: 'system',
+                content: 'You are a helpful AI assistant that provides code analysis, suggestions, and improvements. Focus on performance, readability, and best practices.'
+              },
+              {
+                role: 'user',
+                content: `Please analyze this ${fullContext.language || 'typescript'} code:\n\n${message}\n\nProvide code analysis, suggestions, and improvements.`
+              }
+            ],
             temperature: 0.1,
             max_tokens: 1000
           }
@@ -80,7 +89,14 @@ export class ChatService {
       console.log('ChatService - Response status:', response.status);
       console.log('ChatService - Response data:', response.data);
 
-      if (backendUrl.includes('edenai.run')) {
+      if (backendUrl.includes('deepseek.com')) {
+        // Handle DeepSeek response format
+        if (response.data && response.data.choices && response.data.choices[0] && response.data.choices[0].message) {
+          return response.data.choices[0].message.content;
+        } else {
+          throw new Error('Invalid response format from DeepSeek');
+        }
+      } else if (backendUrl.includes('edenai.run')) {
         // Handle Eden AI response format
         if (response.data && response.data.openai && response.data.openai.generated_text) {
           return response.data.openai.generated_text;
@@ -97,12 +113,16 @@ export class ChatService {
       }
     } catch (error: any) {
       console.error('Chat service error:', error);
+      console.error('Chat service error response:', error.response?.data);
       
       if (error.code === 'ECONNREFUSED') {
         throw new Error('Unable to connect to the analysis service. Please check if the backend server is running.');
       } else if (error.response?.status === 401) {
         // Authentication error - provide a helpful message with guidance
         return "I can see the backend server is running, but authentication is required. Please configure your API key in the Code Improver settings:\n\n1. Open Command Palette (Ctrl+Shift+P / Cmd+Shift+P)\n2. Search for 'Code Improver: Open Settings'\n3. Enter your API key in the 'API Key' field\n4. Save the settings\n\nFor development, you might need to set up authentication or use a development API key.";
+      } else if (error.response?.status === 402) {
+        // Payment required - Eden AI account may need credits
+        return "Your Eden AI account requires payment or credits to use this service. Please check your account balance at https://app.edenai.run/admin/billing and ensure you have sufficient credits for text generation services.";
       } else if (error.response?.status === 404) {
         throw new Error('Analysis endpoint not found. Please check the backend configuration.');
       } else if (error.response?.status === 429) {
@@ -190,7 +210,11 @@ export class ChatService {
     console.log('AuthHeaders - API Key length:', apiKey.length);
 
     // Handle different authentication schemes based on backend URL
-    if (backendUrl.includes('edenai.run') || backendUrl.includes('edenai')) {
+    if (backendUrl.includes('deepseek.com')) {
+      // DeepSeek uses standard Authorization header with Bearer token
+      console.log('AuthHeaders - Using DeepSeek Bearer token authentication');
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    } else if (backendUrl.includes('edenai.run') || backendUrl.includes('edenai')) {
       // Eden AI uses lowercase 'authorization' header for JavaScript/Node.js
       console.log('AuthHeaders - Using Eden AI Bearer token authentication (lowercase header)');
       headers['authorization'] = `Bearer ${apiKey}`;

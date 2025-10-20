@@ -28,7 +28,7 @@ export class SettingsManager {
 
   getSettings(): ExtensionSettings {
     return {
-      backendUrl: this.configuration.get<string>('backendUrl') || 'https://api.edenai.run/v2',
+      backendUrl: this.configuration.get<string>('backendUrl') || 'https://api.deepseek.com',
       apiKey: this.configuration.get<string>('apiKey'),
       model: this.configuration.get<string>('model') || 'gpt-3.5-turbo',
       autoAnalyze: this.configuration.get<boolean>('autoAnalyze') || false,
@@ -94,7 +94,7 @@ export class SettingsManager {
 
   private getDefaultSettings(): ExtensionSettings {
     return {
-      backendUrl: 'https://api.edenai.run/v2',
+      backendUrl: 'https://api.deepseek.com',
       apiKey: undefined,
       model: 'gpt-3.5-turbo',
       autoAnalyze: false,

@@ -106,7 +106,7 @@ export class SettingsWebview {
                     placeholder="Enter your API key"
                   />
                   <p class="text-xs text-vscode-descriptionForeground mt-1">
-                    For Eden AI, use your API key from <a href="https://docs.edenai.co/" class="text-vscode-textLink-foreground hover:underline" onclick="openEdenAIDocs()">docs.edenai.co</a>
+                    For DeepSeek, use your API key from <a href="https://platform.deepseek.com/api_keys" class="text-vscode-textLink-foreground hover:underline" onclick="openDeepSeekDocs()">platform.deepseek.com</a>
                   </p>
                 </div>
 
@@ -275,10 +275,10 @@ export class SettingsWebview {
             });
           }
 
-          function openEdenAIDocs() {
+          function openDeepSeekDocs() {
             vscode.postMessage({
               type: 'showMessage',
-              text: 'Opening Eden AI documentation...'
+              text: 'Opening DeepSeek API keys page...'
             });
             // Note: In a real implementation, we would open the URL
             // For now, we'll just show a message

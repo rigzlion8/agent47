@@ -45,7 +45,7 @@
       "properties": {
         "codeImprover.backendUrl": {
           "type": "string",
-          "default": "https://api.edenai.run/v2",
+          "default": "https://api.deepseek.com",
           "description": "Backend API URL"
         },
         "codeImprover.apiKey": {
