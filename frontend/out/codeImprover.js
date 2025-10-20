@@ -48,7 +48,14 @@ class CodeImprover {
         }
         // Debug: Check current settings
         const apiKey = this.settingsManager.getApiKey();
+        console.log('=== CODE IMPROVER DEBUG ===');
         console.log('Current API Key from settings:', apiKey ? '***' + apiKey.slice(-4) : 'undefined');
+        console.log('API Key present:', !!apiKey);
+        if (apiKey) {
+            console.log('API Key length:', apiKey.length);
+            console.log('API Key starts with:', apiKey.substring(0, 4) + '...');
+            console.log('API Key ends with:', '...' + apiKey.substring(apiKey.length - 4));
+        }
         console.log('All settings:', this.settingsManager.getSettings());
         await this.analyzeDocument(editor.document);
     }
@@ -74,23 +81,49 @@ class CodeImprover {
                         return;
                     }
                     const headers = this.getAuthHeaders(backendUrl, apiKey);
-                    const response = await axios_1.default.post(`${backendUrl}/api/code/analyze`, {
-                        code,
-                        language,
-                        filePath,
-                        context: {
-                            framework: this.detectFramework(document)
+                    // Use Eden AI's text generation endpoint for code analysis
+                    const endpoint = backendUrl.includes('edenai.run')
+                        ? `${backendUrl}/text/generation`
+                        : `${backendUrl}/api/code/analyze`;
+                    const payload = backendUrl.includes('edenai.run')
+                        ? {
+                            providers: ['openai'],
+                            text: `Please analyze this ${language} code from file ${filePath}:\n\n${code}\n\nProvide code analysis, suggestions, and improvements. Focus on performance, readability, and best practices.`,
+                            temperature: 0.1,
+                            max_tokens: 1500
                         }
-                    }, {
+                        : {
+                            code,
+                            language,
+                            filePath,
+                            context: {
+                                framework: this.detectFramework(document)
+                            }
+                        };
+                    const response = await axios_1.default.post(endpoint, payload, {
                         headers
                     });
-                    const { analysisId, status } = response.data;
-                    if (status === 'queued') {
-                        vscode.window.showInformationMessage(`Analysis queued (ID: ${analysisId})`);
-                        // Poll for results
-                        const suggestions = await this.pollForResults(analysisId, backendUrl, apiKey);
-                        if (suggestions) {
-                            this.displaySuggestions(suggestions, vscode.window.activeTextEditor);
+                    if (backendUrl.includes('edenai.run')) {
+                        // Handle Eden AI response format
+                        if (response.data && response.data.openai && response.data.openai.generated_text) {
+                            const analysis = response.data.openai.generated_text;
+                            vscode.window.showInformationMessage('Code analysis completed');
+                            // For now, just show the analysis in a message
+                            vscode.window.showInformationMessage(`Analysis: ${analysis.substring(0, 100)}...`);
+                        }
+                        else {
+                            throw new Error('Invalid response format from Eden AI');
+                        }
+                    }
+                    else {
+                        const { analysisId, status } = response.data;
+                        if (status === 'queued') {
+                            vscode.window.showInformationMessage(`Analysis queued (ID: ${analysisId})`);
+                            // Poll for results
+                            const suggestions = await this.pollForResults(analysisId, backendUrl, apiKey);
+                            if (suggestions) {
+                                this.displaySuggestions(suggestions, vscode.window.activeTextEditor);
+                            }
                         }
                     }
                 }

@@ -37,11 +37,17 @@ class ChatService {
         const backendUrl = this.settingsManager.getBackendUrl();
         const apiKey = this.settingsManager.getApiKey();
         // Debug logging for API key and backend URL
+        console.log('=== CHAT SERVICE DEBUG ===');
         console.log('ChatService - Backend URL:', backendUrl);
         console.log('ChatService - API Key present:', !!apiKey);
         if (apiKey) {
             console.log('ChatService - API Key length:', apiKey.length);
             console.log('ChatService - API Key starts with:', apiKey.substring(0, 4) + '...');
+            console.log('ChatService - API Key ends with:', '...' + apiKey.substring(apiKey.length - 4));
+        }
+        else {
+            console.log('ChatService - NO API KEY FOUND!');
+            console.log('ChatService - All settings:', this.settingsManager.getSettings());
         }
         if (!apiKey) {
             // For development, allow requests without API key but show a warning
@@ -53,21 +59,44 @@ class ChatService {
             const editorContext = await this.getEditorContext();
             const fullContext = { ...context, ...editorContext };
             const headers = this.getAuthHeaders(backendUrl, apiKey);
-            const response = await axios_1.default.post(`${backendUrl}/api/code/analyze`, {
-                code: message,
-                language: fullContext.language || 'typescript',
-                filePath: fullContext.filePath,
-                context: fullContext
-            }, {
+            // Use Eden AI's text generation endpoint for code analysis
+            const endpoint = backendUrl.includes('edenai.run')
+                ? `${backendUrl}/text/generation`
+                : `${backendUrl}/api/code/analyze`;
+            const payload = backendUrl.includes('edenai.run')
+                ? {
+                    providers: ['openai'],
+                    text: `Please analyze this ${fullContext.language || 'typescript'} code:\n\n${message}\n\nProvide code analysis, suggestions, and improvements.`,
+                    temperature: 0.1,
+                    max_tokens: 1000
+                }
+                : {
+                    code: message,
+                    language: fullContext.language || 'typescript',
+                    filePath: fullContext.filePath,
+                    context: fullContext
+                };
+            const response = await axios_1.default.post(endpoint, payload, {
                 headers,
                 timeout: 30000 // 30 second timeout
             });
-            if (response.data && response.data.analysisId) {
-                // For now, return a placeholder response since we need to handle async analysis
-                return "Your code analysis has been queued. The backend will process it and provide suggestions shortly.";
+            if (backendUrl.includes('edenai.run')) {
+                // Handle Eden AI response format
+                if (response.data && response.data.openai && response.data.openai.generated_text) {
+                    return response.data.openai.generated_text;
+                }
+                else {
+                    throw new Error('Invalid response format from Eden AI');
+                }
             }
             else {
-                throw new Error('Invalid response format from analysis service');
+                if (response.data && response.data.analysisId) {
+                    // For now, return a placeholder response since we need to handle async analysis
+                    return "Your code analysis has been queued. The backend will process it and provide suggestions shortly.";
+                }
+                else {
+                    throw new Error('Invalid response format from analysis service');
+                }
             }
         }
         catch (error) {

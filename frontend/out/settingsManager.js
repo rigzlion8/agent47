@@ -38,7 +38,7 @@ class SettingsManager {
     }
     getSettings() {
         return {
-            backendUrl: this.configuration.get('backendUrl') || 'http://localhost:3006',
+            backendUrl: this.configuration.get('backendUrl') || 'https://api.edenai.run/v2',
             apiKey: this.configuration.get('apiKey'),
             model: this.configuration.get('model') || 'gpt-3.5-turbo',
             autoAnalyze: this.configuration.get('autoAnalyze') || false,
@@ -93,7 +93,7 @@ class SettingsManager {
     }
     getDefaultSettings() {
         return {
-            backendUrl: 'http://localhost:3006',
+            backendUrl: 'https://api.edenai.run/v2',
             apiKey: undefined,
             model: 'gpt-3.5-turbo',
             autoAnalyze: false,
