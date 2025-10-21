@@ -284,6 +284,107 @@ class ChatService {
             ...context
         });
     }
+    async analyzeCode(code, language, context) {
+        const prompt = `Please analyze this ${language} code:\n\n${code}\n\nProvide comprehensive analysis including:\n- Code quality assessment\n- Performance considerations\n- Security issues\n- Best practices\n- Potential improvements\n- Code smells and anti-patterns`;
+        return this.sendMessage(prompt, {
+            language,
+            selectedText: code,
+            ...context
+        });
+    }
+    async readCode(filePath, context) {
+        try {
+            const fs = require('fs');
+            const code = fs.readFileSync(filePath, 'utf8');
+            const language = this.getLanguageFromPath(filePath);
+            const prompt = `Please read and understand this ${language} code from file ${filePath}:\n\n${code}\n\nProvide a comprehensive understanding including:\n- Overall purpose and functionality\n- Key components and their relationships\n- Important functions and methods\n- Data flow and architecture\n- Dependencies and imports`;
+            return this.sendMessage(prompt, {
+                language,
+                filePath,
+                fullDocument: code,
+                ...context
+            });
+        }
+        catch (error) {
+            throw new Error(`Failed to read file ${filePath}: ${error}`);
+        }
+    }
+    async editCode(code, language, editInstructions, context) {
+        const prompt = `Please edit this ${language} code based on the following instructions:\n\nInstructions: ${editInstructions}\n\nOriginal code:\n${code}\n\nProvide the complete edited code with explanations of the changes made.`;
+        return this.sendMessage(prompt, {
+            language,
+            selectedText: code,
+            ...context
+        });
+    }
+    async createDiff(code, language, improvedCode, context) {
+        const prompt = `Please create a diff comparison between the original ${language} code and the improved version:\n\nOriginal code:\n${code}\n\nImproved code:\n${improvedCode}\n\nProvide a detailed diff showing:\n- Lines removed\n- Lines added\n- Lines modified\n- Summary of changes\n- Impact of improvements`;
+        return this.sendMessage(prompt, {
+            language,
+            selectedText: code,
+            ...context
+        });
+    }
+    async refactorCode(code, language, refactoringType, context) {
+        const prompt = `Please refactor this ${language} code using ${refactoringType}:\n\n${code}\n\nProvide the refactored code with explanations of:\n- What was changed\n- Why it was changed\n- Benefits of the refactoring\n- Any trade-offs or considerations`;
+        return this.sendMessage(prompt, {
+            language,
+            selectedText: code,
+            ...context
+        });
+    }
+    async optimizeCode(code, language, optimizationGoal, context) {
+        const prompt = `Please optimize this ${language} code for ${optimizationGoal}:\n\n${code}\n\nProvide the optimized code with:\n- Performance improvements\n- Memory usage optimizations\n- Algorithm enhancements\n- Before/after comparisons\n- Benchmarking considerations`;
+        return this.sendMessage(prompt, {
+            language,
+            selectedText: code,
+            ...context
+        });
+    }
+    async reviewCode(code, language, context) {
+        const prompt = `Please conduct a comprehensive code review for this ${language} code:\n\n${code}\n\nProvide a detailed review covering:\n- Code quality and maintainability\n- Security vulnerabilities\n- Performance issues\n- Best practices compliance\n- Testing considerations\n- Documentation quality\n- Specific recommendations for improvement`;
+        return this.sendMessage(prompt, {
+            language,
+            selectedText: code,
+            ...context
+        });
+    }
+    async documentCode(code, language, documentationType, context) {
+        const prompt = `Please create ${documentationType} documentation for this ${language} code:\n\n${code}\n\nProvide comprehensive documentation including:\n- Function/method descriptions\n- Parameter explanations\n- Return value documentation\n- Usage examples\n- Edge cases and limitations\n- API documentation if applicable`;
+        return this.sendMessage(prompt, {
+            language,
+            selectedText: code,
+            ...context
+        });
+    }
+    getLanguageFromPath(filePath) {
+        const ext = require('path').extname(filePath).toLowerCase();
+        const languageMap = {
+            '.js': 'javascript',
+            '.ts': 'typescript',
+            '.jsx': 'javascript',
+            '.tsx': 'typescript',
+            '.py': 'python',
+            '.java': 'java',
+            '.cpp': 'cpp',
+            '.c': 'c',
+            '.cs': 'csharp',
+            '.php': 'php',
+            '.rb': 'ruby',
+            '.go': 'go',
+            '.rs': 'rust',
+            '.swift': 'swift',
+            '.kt': 'kotlin',
+            '.html': 'html',
+            '.css': 'css',
+            '.scss': 'scss',
+            '.json': 'json',
+            '.xml': 'xml',
+            '.yaml': 'yaml',
+            '.yml': 'yaml'
+        };
+        return languageMap[ext] || 'unknown';
+    }
     handleResponse(responseData, backendUrl) {
         if (backendUrl.includes('generativelanguage.googleapis.com')) {
             // Handle Google Gemini response format

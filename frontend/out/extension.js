@@ -96,7 +96,126 @@ function activate(context) {
             }
         }, 100);
     });
-    context.subscriptions.push(analyzeFileCommand, analyzeProjectCommand, openSettingsCommand, openChatCommand, explainCodeCommand, improveCodeCommand, chatViewDisposable);
+    // New code operation commands
+    const analyzeCodeCommand = vscode.commands.registerCommand('code-improver.analyzeCode', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            vscode.window.showErrorMessage('No active editor found');
+            return;
+        }
+        const selection = editor.selection;
+        const document = editor.document;
+        const selectedText = selection.isEmpty ? document.getText() : document.getText(selection);
+        if (!selectedText.trim()) {
+            vscode.window.showWarningMessage('No code selected');
+            return;
+        }
+        const chatPanel = ChatPanel_1.ChatPanel.createOrShow(context.extensionUri, chatService);
+        // Auto-send analysis request
+        setTimeout(async () => {
+            try {
+                const analysis = await chatService.analyzeCode(selectedText, document.languageId, {
+                    filePath: document.fileName,
+                    language: document.languageId,
+                    selectedText: selectedText
+                });
+                // This will be handled by the chat panel's message handling
+            }
+            catch (error) {
+                vscode.window.showErrorMessage(`Failed to analyze code: ${error}`);
+            }
+        }, 100);
+    });
+    const readCodeCommand = vscode.commands.registerCommand('code-improver.readCode', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            vscode.window.showErrorMessage('No active editor found');
+            return;
+        }
+        const document = editor.document;
+        const chatPanel = ChatPanel_1.ChatPanel.createOrShow(context.extensionUri, chatService);
+        // Auto-send read request
+        setTimeout(async () => {
+            try {
+                const analysis = await chatService.readCode(document.fileName, {
+                    filePath: document.fileName,
+                    language: document.languageId,
+                    fullDocument: document.getText()
+                });
+                // This will be handled by the chat panel's message handling
+            }
+            catch (error) {
+                vscode.window.showErrorMessage(`Failed to read code: ${error}`);
+            }
+        }, 100);
+    });
+    const editCodeCommand = vscode.commands.registerCommand('code-improver.editCode', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            vscode.window.showErrorMessage('No active editor found');
+            return;
+        }
+        const selection = editor.selection;
+        const document = editor.document;
+        const selectedText = selection.isEmpty ? document.getText() : document.getText(selection);
+        if (!selectedText.trim()) {
+            vscode.window.showWarningMessage('No code selected');
+            return;
+        }
+        // Ask user for edit instructions
+        const instructions = await vscode.window.showInputBox({
+            prompt: 'Enter edit instructions',
+            placeHolder: 'e.g., Add error handling, optimize performance, etc.'
+        });
+        if (!instructions) {
+            return;
+        }
+        const chatPanel = ChatPanel_1.ChatPanel.createOrShow(context.extensionUri, chatService);
+        // Auto-send edit request
+        setTimeout(async () => {
+            try {
+                const editedCode = await chatService.editCode(selectedText, document.languageId, instructions, {
+                    filePath: document.fileName,
+                    language: document.languageId,
+                    selectedText: selectedText
+                });
+                // This will be handled by the chat panel's message handling
+            }
+            catch (error) {
+                vscode.window.showErrorMessage(`Failed to edit code: ${error}`);
+            }
+        }, 100);
+    });
+    const reviewCodeCommand = vscode.commands.registerCommand('code-improver.reviewCode', async () => {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            vscode.window.showErrorMessage('No active editor found');
+            return;
+        }
+        const selection = editor.selection;
+        const document = editor.document;
+        const selectedText = selection.isEmpty ? document.getText() : document.getText(selection);
+        if (!selectedText.trim()) {
+            vscode.window.showWarningMessage('No code selected');
+            return;
+        }
+        const chatPanel = ChatPanel_1.ChatPanel.createOrShow(context.extensionUri, chatService);
+        // Auto-send review request
+        setTimeout(async () => {
+            try {
+                const review = await chatService.reviewCode(selectedText, document.languageId, {
+                    filePath: document.fileName,
+                    language: document.languageId,
+                    selectedText: selectedText
+                });
+                // This will be handled by the chat panel's message handling
+            }
+            catch (error) {
+                vscode.window.showErrorMessage(`Failed to review code: ${error}`);
+            }
+        }, 100);
+    });
+    context.subscriptions.push(analyzeFileCommand, analyzeProjectCommand, openSettingsCommand, openChatCommand, explainCodeCommand, improveCodeCommand, analyzeCodeCommand, readCodeCommand, editCodeCommand, reviewCodeCommand, chatViewDisposable);
     // Auto-analyze on save if enabled
     if (settingsManager.getAutoAnalyze()) {
         const saveDisposable = vscode.workspace.onDidSaveTextDocument((document) => {

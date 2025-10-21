@@ -56,6 +56,30 @@ class ChatViewProvider {
                 case 'openSettings':
                     await vscode.commands.executeCommand('code-improver.openSettings');
                     break;
+                case 'analyzeCode':
+                    await this.handleCodeAnalysis(message.code, message.language, message.context);
+                    break;
+                case 'readCode':
+                    await this.handleCodeReading(message.filePath, message.context);
+                    break;
+                case 'editCode':
+                    await this.handleCodeEditing(message.code, message.language, message.instructions, message.context);
+                    break;
+                case 'createDiff':
+                    await this.handleDiffCreation(message.originalCode, message.improvedCode, message.language, message.context);
+                    break;
+                case 'refactorCode':
+                    await this.handleCodeRefactoring(message.code, message.language, message.refactoringType, message.context);
+                    break;
+                case 'optimizeCode':
+                    await this.handleCodeOptimization(message.code, message.language, message.optimizationGoal, message.context);
+                    break;
+                case 'reviewCode':
+                    await this.handleCodeReview(message.code, message.language, message.context);
+                    break;
+                case 'documentCode':
+                    await this.handleCodeDocumentation(message.code, message.language, message.documentationType, message.context);
+                    break;
             }
         }, undefined);
     }
@@ -125,6 +149,342 @@ class ChatViewProvider {
     clearChat() {
         this.messages = [];
         this.addWelcomeMessage();
+    }
+    async handleCodeAnalysis(code, language, context) {
+        const userMessage = {
+            id: Date.now().toString(),
+            role: 'user',
+            content: `Analyze this ${language} code:\n\n${code}`,
+            timestamp: new Date(),
+            codeContext: context
+        };
+        this.messages.push(userMessage);
+        this.updateWebview();
+        const typingMessage = {
+            id: 'typing',
+            role: 'assistant',
+            content: 'Analyzing code...',
+            timestamp: new Date()
+        };
+        this.messages.push(typingMessage);
+        this.updateWebview();
+        try {
+            const response = await this.chatService.analyzeCode(code, language, context);
+            this.messages = this.messages.filter(msg => msg.id !== 'typing');
+            const assistantMessage = {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: response,
+                timestamp: new Date()
+            };
+            this.messages.push(assistantMessage);
+            this.updateWebview();
+        }
+        catch (error) {
+            this.messages = this.messages.filter(msg => msg.id !== 'typing');
+            const errorMessage = {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: `Analysis failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                timestamp: new Date()
+            };
+            this.messages.push(errorMessage);
+            this.updateWebview();
+        }
+    }
+    async handleCodeReading(filePath, context) {
+        const userMessage = {
+            id: Date.now().toString(),
+            role: 'user',
+            content: `Read and understand code from: ${filePath}`,
+            timestamp: new Date(),
+            codeContext: context
+        };
+        this.messages.push(userMessage);
+        this.updateWebview();
+        const typingMessage = {
+            id: 'typing',
+            role: 'assistant',
+            content: 'Reading code file...',
+            timestamp: new Date()
+        };
+        this.messages.push(typingMessage);
+        this.updateWebview();
+        try {
+            const response = await this.chatService.readCode(filePath, context);
+            this.messages = this.messages.filter(msg => msg.id !== 'typing');
+            const assistantMessage = {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: response,
+                timestamp: new Date()
+            };
+            this.messages.push(assistantMessage);
+            this.updateWebview();
+        }
+        catch (error) {
+            this.messages = this.messages.filter(msg => msg.id !== 'typing');
+            const errorMessage = {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: `Failed to read code: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                timestamp: new Date()
+            };
+            this.messages.push(errorMessage);
+            this.updateWebview();
+        }
+    }
+    async handleCodeEditing(code, language, instructions, context) {
+        const userMessage = {
+            id: Date.now().toString(),
+            role: 'user',
+            content: `Edit this ${language} code with instructions: ${instructions}\n\nCode:\n${code}`,
+            timestamp: new Date(),
+            codeContext: context
+        };
+        this.messages.push(userMessage);
+        this.updateWebview();
+        const typingMessage = {
+            id: 'typing',
+            role: 'assistant',
+            content: 'Editing code...',
+            timestamp: new Date()
+        };
+        this.messages.push(typingMessage);
+        this.updateWebview();
+        try {
+            const response = await this.chatService.editCode(code, language, instructions, context);
+            this.messages = this.messages.filter(msg => msg.id !== 'typing');
+            const assistantMessage = {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: response,
+                timestamp: new Date()
+            };
+            this.messages.push(assistantMessage);
+            this.updateWebview();
+        }
+        catch (error) {
+            this.messages = this.messages.filter(msg => msg.id !== 'typing');
+            const errorMessage = {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: `Failed to edit code: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                timestamp: new Date()
+            };
+            this.messages.push(errorMessage);
+            this.updateWebview();
+        }
+    }
+    async handleDiffCreation(originalCode, improvedCode, language, context) {
+        const userMessage = {
+            id: Date.now().toString(),
+            role: 'user',
+            content: `Create diff between original and improved ${language} code`,
+            timestamp: new Date(),
+            codeContext: context
+        };
+        this.messages.push(userMessage);
+        this.updateWebview();
+        const typingMessage = {
+            id: 'typing',
+            role: 'assistant',
+            content: 'Creating diff...',
+            timestamp: new Date()
+        };
+        this.messages.push(typingMessage);
+        this.updateWebview();
+        try {
+            const response = await this.chatService.createDiff(originalCode, language, improvedCode, context);
+            this.messages = this.messages.filter(msg => msg.id !== 'typing');
+            const assistantMessage = {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: response,
+                timestamp: new Date()
+            };
+            this.messages.push(assistantMessage);
+            this.updateWebview();
+        }
+        catch (error) {
+            this.messages = this.messages.filter(msg => msg.id !== 'typing');
+            const errorMessage = {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: `Failed to create diff: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                timestamp: new Date()
+            };
+            this.messages.push(errorMessage);
+            this.updateWebview();
+        }
+    }
+    async handleCodeRefactoring(code, language, refactoringType, context) {
+        const userMessage = {
+            id: Date.now().toString(),
+            role: 'user',
+            content: `Refactor this ${language} code using ${refactoringType}:\n\n${code}`,
+            timestamp: new Date(),
+            codeContext: context
+        };
+        this.messages.push(userMessage);
+        this.updateWebview();
+        const typingMessage = {
+            id: 'typing',
+            role: 'assistant',
+            content: 'Refactoring code...',
+            timestamp: new Date()
+        };
+        this.messages.push(typingMessage);
+        this.updateWebview();
+        try {
+            const response = await this.chatService.refactorCode(code, language, refactoringType, context);
+            this.messages = this.messages.filter(msg => msg.id !== 'typing');
+            const assistantMessage = {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: response,
+                timestamp: new Date()
+            };
+            this.messages.push(assistantMessage);
+            this.updateWebview();
+        }
+        catch (error) {
+            this.messages = this.messages.filter(msg => msg.id !== 'typing');
+            const errorMessage = {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: `Failed to refactor code: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                timestamp: new Date()
+            };
+            this.messages.push(errorMessage);
+            this.updateWebview();
+        }
+    }
+    async handleCodeOptimization(code, language, optimizationGoal, context) {
+        const userMessage = {
+            id: Date.now().toString(),
+            role: 'user',
+            content: `Optimize this ${language} code for ${optimizationGoal}:\n\n${code}`,
+            timestamp: new Date(),
+            codeContext: context
+        };
+        this.messages.push(userMessage);
+        this.updateWebview();
+        const typingMessage = {
+            id: 'typing',
+            role: 'assistant',
+            content: 'Optimizing code...',
+            timestamp: new Date()
+        };
+        this.messages.push(typingMessage);
+        this.updateWebview();
+        try {
+            const response = await this.chatService.optimizeCode(code, language, optimizationGoal, context);
+            this.messages = this.messages.filter(msg => msg.id !== 'typing');
+            const assistantMessage = {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: response,
+                timestamp: new Date()
+            };
+            this.messages.push(assistantMessage);
+            this.updateWebview();
+        }
+        catch (error) {
+            this.messages = this.messages.filter(msg => msg.id !== 'typing');
+            const errorMessage = {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: `Failed to optimize code: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                timestamp: new Date()
+            };
+            this.messages.push(errorMessage);
+            this.updateWebview();
+        }
+    }
+    async handleCodeReview(code, language, context) {
+        const userMessage = {
+            id: Date.now().toString(),
+            role: 'user',
+            content: `Review this ${language} code:\n\n${code}`,
+            timestamp: new Date(),
+            codeContext: context
+        };
+        this.messages.push(userMessage);
+        this.updateWebview();
+        const typingMessage = {
+            id: 'typing',
+            role: 'assistant',
+            content: 'Reviewing code...',
+            timestamp: new Date()
+        };
+        this.messages.push(typingMessage);
+        this.updateWebview();
+        try {
+            const response = await this.chatService.reviewCode(code, language, context);
+            this.messages = this.messages.filter(msg => msg.id !== 'typing');
+            const assistantMessage = {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: response,
+                timestamp: new Date()
+            };
+            this.messages.push(assistantMessage);
+            this.updateWebview();
+        }
+        catch (error) {
+            this.messages = this.messages.filter(msg => msg.id !== 'typing');
+            const errorMessage = {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: `Failed to review code: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                timestamp: new Date()
+            };
+            this.messages.push(errorMessage);
+            this.updateWebview();
+        }
+    }
+    async handleCodeDocumentation(code, language, documentationType, context) {
+        const userMessage = {
+            id: Date.now().toString(),
+            role: 'user',
+            content: `Create ${documentationType} documentation for this ${language} code:\n\n${code}`,
+            timestamp: new Date(),
+            codeContext: context
+        };
+        this.messages.push(userMessage);
+        this.updateWebview();
+        const typingMessage = {
+            id: 'typing',
+            role: 'assistant',
+            content: 'Creating documentation...',
+            timestamp: new Date()
+        };
+        this.messages.push(typingMessage);
+        this.updateWebview();
+        try {
+            const response = await this.chatService.documentCode(code, language, documentationType, context);
+            this.messages = this.messages.filter(msg => msg.id !== 'typing');
+            const assistantMessage = {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: response,
+                timestamp: new Date()
+            };
+            this.messages.push(assistantMessage);
+            this.updateWebview();
+        }
+        catch (error) {
+            this.messages = this.messages.filter(msg => msg.id !== 'typing');
+            const errorMessage = {
+                id: Date.now().toString(),
+                role: 'assistant',
+                content: `Failed to create documentation: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                timestamp: new Date()
+            };
+            this.messages.push(errorMessage);
+            this.updateWebview();
+        }
     }
     addWelcomeMessage() {
         const welcomeMessage = {

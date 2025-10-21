@@ -38,6 +38,22 @@
       {
         "command": "code-improver.improveCode",
         "title": "Improve Selected Code"
+      },
+      {
+        "command": "code-improver.analyzeCode",
+        "title": "Analyze Selected Code"
+      },
+      {
+        "command": "code-improver.readCode",
+        "title": "Read Current File"
+      },
+      {
+        "command": "code-improver.editCode",
+        "title": "Edit Selected Code"
+      },
+      {
+        "command": "code-improver.reviewCode",
+        "title": "Review Selected Code"
       }
     ],
     "configuration": {
@@ -77,6 +93,22 @@
         {
           "command": "code-improver.improveCode",
           "when": "editorHasSelection"
+        },
+        {
+          "command": "code-improver.analyzeCode",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "code-improver.readCode",
+          "when": "true"
+        },
+        {
+          "command": "code-improver.editCode",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "code-improver.reviewCode",
+          "when": "editorHasSelection"
         }
       ],
       "editor/context": [
@@ -89,6 +121,26 @@
           "command": "code-improver.improveCode",
           "group": "code-improver",
           "when": "editorHasSelection"
+        },
+        {
+          "command": "code-improver.analyzeCode",
+          "group": "code-improver",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "code-improver.editCode",
+          "group": "code-improver",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "code-improver.reviewCode",
+          "group": "code-improver",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "code-improver.readCode",
+          "group": "code-improver",
+          "when": "true"
         }
       ]
     },
