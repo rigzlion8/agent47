@@ -31,7 +31,7 @@ const vscode = __importStar(require("vscode"));
 const SuggestionDecorator_1 = require("./services/SuggestionDecorator");
 const SuggestionPanel_1 = require("./views/SuggestionPanel");
 const FileIndexer_1 = require("./services/FileIndexer");
-const axios_1 = __importDefault(require("axios"));
+const axiosConfig_1 = __importDefault(require("./utils/axiosConfig"));
 class CodeImprover {
     constructor(settingsManager) {
         this.settingsManager = settingsManager;
@@ -138,7 +138,7 @@ class CodeImprover {
                             }
                         };
                     }
-                    const response = await axios_1.default.post(endpoint, payload, {
+                    const response = await axiosConfig_1.default.post(endpoint, payload, {
                         headers
                     });
                     if (backendUrl.includes('generativelanguage.googleapis.com')) {
@@ -237,7 +237,7 @@ class CodeImprover {
         for (let attempt = 0; attempt < maxAttempts; attempt++) {
             try {
                 const headers = this.getAuthHeaders(backendUrl, apiKey);
-                const response = await axios_1.default.get(`${backendUrl}/api/code/analysis/${analysisId}`, {
+                const response = await axiosConfig_1.default.get(`${backendUrl}/api/code/analysis/${analysisId}`, {
                     headers
                 });
                 const { status, suggestions } = response.data;

@@ -28,7 +28,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ChatService = void 0;
 const vscode = __importStar(require("vscode"));
-const axios_1 = __importDefault(require("axios"));
+const axiosConfig_1 = __importDefault(require("../utils/axiosConfig"));
 class ChatService {
     constructor(settingsManager) {
         this.settingsManager = settingsManager;
@@ -139,12 +139,12 @@ class ChatService {
             console.log('Model:', this.settingsManager.getModel());
             console.log('Timeout: 30 seconds');
             // Create axios instance with better timeout and cancellation handling
-            const source = axios_1.default.CancelToken.source();
+            const source = axiosConfig_1.default.CancelToken.source();
             const timeout = setTimeout(() => {
                 source.cancel('Request timeout after 30 seconds');
             }, 30000);
             try {
-                const response = await axios_1.default.post(endpoint, payload, {
+                const response = await axiosConfig_1.default.post(endpoint, payload, {
                     headers,
                     cancelToken: source.token,
                     timeout: 30000 // 30 second timeout
@@ -190,7 +190,6 @@ class ChatService {
                         throw new Error('Invalid response format from analysis service');
                     }
                 }
-                return this.handleResponse(response.data, backendUrl);
             }
             catch (error) {
                 clearTimeout(timeout);
@@ -206,7 +205,7 @@ class ChatService {
             console.error('Error response data:', error.response?.data);
             console.error('Error stack:', error.stack);
             // Handle axios cancellation specifically
-            if (axios_1.default.isCancel(error)) {
+            if (axiosConfig_1.default.isCancel(error)) {
                 throw new Error('Request was cancelled due to timeout. Please try again.');
             }
             if (error.code === 'ECONNREFUSED') {
@@ -527,7 +526,7 @@ class ChatService {
     }
     isRetryableError(error) {
         // Retry on network errors, timeouts, and server errors (5xx)
-        if (axios_1.default.isCancel(error)) {
+        if (axiosConfig_1.default.isCancel(error)) {
             return true; // Timeout or cancellation
         }
         if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {

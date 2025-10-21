@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import axios from 'axios';
+import axios from '../utils/axiosConfig';
 import { SettingsManager } from '../settingsManager';
 
 export interface ChatContext {
@@ -178,7 +178,6 @@ export class ChatService {
           throw new Error('Invalid response format from analysis service');
         }
       }
-        return this.handleResponse(response.data, backendUrl);
       } catch (error: any) {
         clearTimeout(timeout);
         throw error;

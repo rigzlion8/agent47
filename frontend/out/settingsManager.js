@@ -38,7 +38,7 @@ class SettingsManager {
     }
     getSettings() {
         return {
-            backendUrl: this.configuration.get('backendUrl') || 'http://localhost:3006',
+            backendUrl: this.configuration.get('backendUrl') || 'https://api.deepseek.com/v1',
             apiKey: this.configuration.get('apiKey'),
             model: this.configuration.get('model') || 'deepseek-chat',
             autoAnalyze: this.configuration.get('autoAnalyze') || false,
@@ -68,7 +68,7 @@ class SettingsManager {
         this.notifyListeners();
     }
     async openSettings() {
-        await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:your-username.code-improver');
+        await vscode.commands.executeCommand('workbench.action.openSettings', 'codeImprover');
     }
     async resetSettings() {
         const configuration = vscode.workspace.getConfiguration('codeImprover');
@@ -93,7 +93,7 @@ class SettingsManager {
     }
     getDefaultSettings() {
         return {
-            backendUrl: 'http://localhost:3006',
+            backendUrl: 'https://api.deepseek.com/v1',
             apiKey: undefined,
             model: 'deepseek-chat',
             autoAnalyze: false,

@@ -48,51 +48,76 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   private setupMessageHandlers(webview: vscode.Webview) {
     webview.onDidReceiveMessage(
       async (message) => {
+        console.log('=== WEBVIEW MESSAGE RECEIVED ===');
+        console.log('Message command:', message.command);
+        console.log('Message content:', message.content ? message.content.substring(0, 100) + '...' : 'No content');
+        console.log('Message context:', message.codeContext);
+        
         switch (message.command) {
           case 'sendMessage':
+            console.log('Handling sendMessage...');
+            console.log('Full message content length:', message.content?.length);
+            console.log('Code context available:', !!message.codeContext);
             await this.handleUserMessage(message.content, message.codeContext);
             break;
           case 'clearChat':
+            console.log('Handling clearChat...');
             this.clearChat();
             break;
           case 'getCodeContext':
+            console.log('Handling getCodeContext...');
             await this.sendCodeContext();
             break;
           case 'openSettings':
+            console.log('Handling openSettings...');
             await vscode.commands.executeCommand('code-improver.openSettings');
             break;
           case 'analyzeCode':
+            console.log('Handling analyzeCode...');
             await this.handleCodeAnalysis(message.code, message.language, message.context);
             break;
           case 'readCode':
+            console.log('Handling readCode...');
             await this.handleCodeReading(message.filePath, message.context);
             break;
           case 'editCode':
+            console.log('Handling editCode...');
             await this.handleCodeEditing(message.code, message.language, message.instructions, message.context);
             break;
           case 'createDiff':
+            console.log('Handling createDiff...');
             await this.handleDiffCreation(message.originalCode, message.improvedCode, message.language, message.context);
             break;
           case 'refactorCode':
+            console.log('Handling refactorCode...');
             await this.handleCodeRefactoring(message.code, message.language, message.refactoringType, message.context);
             break;
           case 'optimizeCode':
+            console.log('Handling optimizeCode...');
             await this.handleCodeOptimization(message.code, message.language, message.optimizationGoal, message.context);
             break;
           case 'reviewCode':
+            console.log('Handling reviewCode...');
             await this.handleCodeReview(message.code, message.language, message.context);
             break;
           case 'documentCode':
+            console.log('Handling documentCode...');
             await this.handleCodeDocumentation(message.code, message.language, message.documentationType, message.context);
             break;
           case 'showContentMenu':
+            console.log('Handling showContentMenu...');
             await this.showContentMenu();
             break;
           case 'showCommandMenu':
+            console.log('Handling showCommandMenu...');
             await this.showCommandMenu();
             break;
           case 'addContent':
+            console.log('Handling addContent...');
             await this.handleAddContent(message.content, message.type);
+            break;
+          default:
+            console.log('Unknown command:', message.command);
             break;
         }
       },
@@ -989,23 +1014,43 @@ You can also select code in your editor and ask me about it directly!`,
           
           // Send message
           function sendMessage() {
+            console.log('sendMessage called');
+            
+            // Double-check that messageInput exists
+            if (!messageInput) {
+              console.error('messageInput is null or undefined!');
+              return;
+            }
+            
             const content = messageInput.value.trim();
-            if (!content) return;
+            console.log('Message content:', content);
+            console.log('Message input value length:', messageInput.value.length);
             
-            // Get current code context
-            vscode.postMessage({ command: 'getCodeContext' });
+            if (!content) {
+              console.log('Empty message, returning');
+              return;
+            }
             
-            // Wait a moment for context to be received, then send message
-            setTimeout(() => {
+            // Use stored code context or empty object
+            const codeContext = window.currentCodeContext || {};
+            console.log('Sending message to extension:', content);
+            console.log('Code context:', codeContext);
+            
+            try {
               vscode.postMessage({
                 command: 'sendMessage',
                 content: content,
-                codeContext: window.currentCodeContext
+                codeContext: codeContext
               });
-              
-              messageInput.value = '';
-              messageInput.style.height = 'auto';
-            }, 100);
+              console.log('Message posted to vscode successfully');
+            } catch (error) {
+              console.error('Error posting message to vscode:', error);
+            }
+            
+            // Clear input and reset height
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+            console.log('Message input cleared');
           }
 
           // Handle file drag and drop
@@ -1109,9 +1154,40 @@ You can also select code in your editor and ask me about it directly!`,
           }
           
           // Event listeners
-          sendButton.addEventListener('click', sendMessage);
-          clearButton.addEventListener('click', clearChat);
-          settingsButton.addEventListener('click', openSettings);
+          console.log('Setting up event listeners...');
+          
+          // Ensure elements exist before adding listeners
+          if (sendButton) {
+            sendButton.addEventListener('click', (e) => {
+              console.log('Send button clicked');
+              e.preventDefault();
+              sendMessage();
+            });
+          } else {
+            console.error('Send button not found!');
+          }
+          
+          if (clearButton) {
+            clearButton.addEventListener('click', (e) => {
+              console.log('Clear button clicked');
+              e.preventDefault();
+              clearChat();
+            });
+          } else {
+            console.error('Clear button not found!');
+          }
+          
+          if (settingsButton) {
+            settingsButton.addEventListener('click', (e) => {
+              console.log('Settings button clicked');
+              e.preventDefault();
+              openSettings();
+            });
+          } else {
+            console.error('Settings button not found!');
+          }
+          
+          console.log('Event listeners set up successfully');
           
           // Add drag and drop event listeners
           messageInput.addEventListener('dragover', (e) => {
@@ -1128,16 +1204,26 @@ You can also select code in your editor and ask me about it directly!`,
           
           messageInput.addEventListener('drop', handleFileDrop);
           
-          messageInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              sendMessage();
-            } else if (e.key === '@') {
-              handleAtMention();
-            } else if (e.key === '/') {
-              handleSlashCommand();
-            }
-          });
+          if (messageInput) {
+            messageInput.addEventListener('keydown', (e) => {
+              console.log('Key pressed:', e.key);
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                console.log('Sending message via Enter key...');
+                sendMessage();
+              } else if (e.key === '@') {
+                e.preventDefault();
+                console.log('Opening @ menu...');
+                handleAtMention();
+              } else if (e.key === '/') {
+                e.preventDefault();
+                console.log('Opening / menu...');
+                handleSlashCommand();
+              }
+            });
+          } else {
+            console.error('Message input not found!');
+          }
           
           messageInput.addEventListener('input', (e) => {
             // Auto-resize textarea
@@ -1146,7 +1232,11 @@ You can also select code in your editor and ask me about it directly!`,
           });
           
           // Auto-focus input
-          messageInput.focus();
+          if (messageInput) {
+            messageInput.focus();
+          } else {
+            console.error('Cannot focus - message input not found!');
+          }
           
           // Listen for code context updates
           window.addEventListener('message', (event) => {

@@ -3,7 +3,7 @@ import { SettingsManager } from './settingsManager';
 import { SuggestionDecorator } from './services/SuggestionDecorator';
 import { SuggestionPanel } from './views/SuggestionPanel';
 import { FileIndexer } from './services/FileIndexer';
-import axios from 'axios';
+import axios from './utils/axiosConfig';
 import { Suggestion } from './types/shared';
 
 export class CodeImprover {
