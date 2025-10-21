@@ -28,9 +28,9 @@ export class SettingsManager {
 
   getSettings(): ExtensionSettings {
     return {
-      backendUrl: this.configuration.get<string>('backendUrl') || 'https://api.deepseek.com',
+      backendUrl: this.configuration.get<string>('backendUrl') || 'https://api.deepseek.com/v1',
       apiKey: this.configuration.get<string>('apiKey'),
-      model: this.configuration.get<string>('model') || 'gpt-3.5-turbo',
+      model: this.configuration.get<string>('model') || 'deepseek-chat',
       autoAnalyze: this.configuration.get<boolean>('autoAnalyze') || false,
       excludedPatterns: this.configuration.get<string[]>('excludedPatterns') || [
         '**/node_modules/**',
@@ -94,9 +94,9 @@ export class SettingsManager {
 
   private getDefaultSettings(): ExtensionSettings {
     return {
-      backendUrl: 'https://api.deepseek.com',
+      backendUrl: 'https://api.deepseek.com/v1',
       apiKey: undefined,
-      model: 'gpt-3.5-turbo',
+      model: 'deepseek-chat',
       autoAnalyze: false,
       excludedPatterns: [
         '**/node_modules/**',

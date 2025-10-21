@@ -45,7 +45,7 @@
       "properties": {
         "codeImprover.backendUrl": {
           "type": "string",
-          "default": "https://api.deepseek.com",
+          "default": "https://api.deepseek.com/v1",
           "description": "Backend API URL"
         },
         "codeImprover.apiKey": {
@@ -54,7 +54,7 @@
         },
         "codeImprover.model": {
           "type": "string",
-          "default": "gpt-3.5-turbo",
+          "default": "deepseek-chat",
           "description": "AI model to use for code analysis"
         },
         "codeImprover.autoAnalyze": {

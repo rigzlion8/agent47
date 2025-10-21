@@ -57,6 +57,7 @@ class CodeImprover {
             console.log('API Key ends with:', '...' + apiKey.substring(apiKey.length - 4));
         }
         console.log('All settings:', this.settingsManager.getSettings());
+        console.log('Model from settings:', this.settingsManager.getModel());
         await this.analyzeDocument(editor.document);
     }
     async analyzeDocument(document) {
@@ -81,18 +82,54 @@ class CodeImprover {
                         return;
                     }
                     const headers = this.getAuthHeaders(backendUrl, apiKey);
-                    // Use Eden AI's text generation endpoint for code analysis
-                    const endpoint = backendUrl.includes('edenai.run')
-                        ? `${backendUrl}/text/generation`
-                        : `${backendUrl}/api/code/analyze`;
-                    const payload = backendUrl.includes('edenai.run')
-                        ? {
-                            providers: ['openai'],
-                            text: `Please analyze this ${language} code from file ${filePath}:\n\n${code}\n\nProvide code analysis, suggestions, and improvements. Focus on performance, readability, and best practices.`,
+                    // Use appropriate endpoint based on backend URL
+                    let endpoint;
+                    if (backendUrl.includes('generativelanguage.googleapis.com')) {
+                        endpoint = `${backendUrl}/models/${this.settingsManager.getModel()}:generateContent?key=${apiKey}`;
+                    }
+                    else if (backendUrl.includes('deepseek.com')) {
+                        endpoint = `${backendUrl}/chat/completions`;
+                    }
+                    else {
+                        endpoint = `${backendUrl}/api/code/analyze`;
+                    }
+                    console.log('Constructed endpoint URL:', endpoint);
+                    console.log('Backend URL:', backendUrl);
+                    console.log('Model:', this.settingsManager.getModel());
+                    console.log('API Key present:', !!apiKey);
+                    let payload;
+                    if (backendUrl.includes('generativelanguage.googleapis.com')) {
+                        payload = {
+                            contents: [
+                                {
+                                    parts: [
+                                        {
+                                            text: `Please analyze this ${language} code from file ${filePath}:\n\n${code}\n\nProvide code analysis, suggestions, and improvements. Focus on performance, readability, and best practices.`
+                                        }
+                                    ]
+                                }
+                            ],
+                            generationConfig: {
+                                temperature: 0.1,
+                                maxOutputTokens: 1500
+                            }
+                        };
+                    }
+                    else if (backendUrl.includes('deepseek.com')) {
+                        payload = {
+                            model: this.settingsManager.getModel(),
+                            messages: [
+                                {
+                                    role: "user",
+                                    content: `Please analyze this ${language} code from file ${filePath}:\n\n${code}\n\nProvide code analysis, suggestions, and improvements. Focus on performance, readability, and best practices.`
+                                }
+                            ],
                             temperature: 0.1,
                             max_tokens: 1500
-                        }
-                        : {
+                        };
+                    }
+                    else {
+                        payload = {
                             code,
                             language,
                             filePath,
@@ -100,19 +137,31 @@ class CodeImprover {
                                 framework: this.detectFramework(document)
                             }
                         };
+                    }
                     const response = await axios_1.default.post(endpoint, payload, {
                         headers
                     });
-                    if (backendUrl.includes('edenai.run')) {
-                        // Handle Eden AI response format
-                        if (response.data && response.data.openai && response.data.openai.generated_text) {
-                            const analysis = response.data.openai.generated_text;
+                    if (backendUrl.includes('generativelanguage.googleapis.com')) {
+                        // Handle Google Gemini response format
+                        if (response.data && response.data.candidates && response.data.candidates[0] && response.data.candidates[0].content) {
+                            const analysis = response.data.candidates[0].content.parts[0].text;
                             vscode.window.showInformationMessage('Code analysis completed');
                             // For now, just show the analysis in a message
                             vscode.window.showInformationMessage(`Analysis: ${analysis.substring(0, 100)}...`);
                         }
                         else {
-                            throw new Error('Invalid response format from Eden AI');
+                            throw new Error('Invalid response format from Google Gemini');
+                        }
+                    }
+                    else if (backendUrl.includes('deepseek.com')) {
+                        // Handle DeepSeek response format
+                        if (response.data && response.data.choices && response.data.choices[0] && response.data.choices[0].message) {
+                            const analysis = response.data.choices[0].message.content;
+                            vscode.window.showInformationMessage('Code analysis completed');
+                            vscode.window.showInformationMessage(`Analysis: ${analysis.substring(0, 100)}...`);
+                        }
+                        else {
+                            throw new Error('Invalid response format from DeepSeek');
                         }
                     }
                     else {
@@ -129,7 +178,25 @@ class CodeImprover {
                 }
                 catch (error) {
                     console.error('Analysis error:', error);
-                    vscode.window.showErrorMessage(`Analysis failed: ${error.response?.data?.error || error.message}`);
+                    console.error('Analysis error response:', error.response?.data);
+                    let errorMessage = error.message;
+                    if (error.response?.data?.error) {
+                        // Handle Google Gemini error format
+                        const errorData = error.response.data.error;
+                        if (typeof errorData === 'object' && errorData.message) {
+                            errorMessage = `Google Gemini API error: ${errorData.message}`;
+                        }
+                        else if (typeof errorData === 'string') {
+                            errorMessage = `Analysis service error: ${errorData}`;
+                        }
+                        else {
+                            errorMessage = `Analysis service error: ${JSON.stringify(errorData)}`;
+                        }
+                    }
+                    else if (error.response?.data) {
+                        errorMessage = `Analysis service error: ${JSON.stringify(error.response.data)}`;
+                    }
+                    vscode.window.showErrorMessage(`Analysis failed: ${errorMessage}`);
                 }
             });
         }
@@ -204,7 +271,11 @@ class CodeImprover {
         console.log('AuthHeaders - Backend URL:', backendUrl);
         console.log('AuthHeaders - API Key length:', apiKey.length);
         // Handle different authentication schemes based on backend URL
-        if (backendUrl.includes('edenai.run') || backendUrl.includes('edenai')) {
+        if (backendUrl.includes('generativelanguage.googleapis.com')) {
+            // Google Gemini uses query parameter for API key, no special headers needed
+            console.log('AuthHeaders - Using Google Gemini API key authentication (via query parameter)');
+        }
+        else if (backendUrl.includes('edenai.run') || backendUrl.includes('edenai')) {
             // Eden AI uses lowercase 'authorization' header for JavaScript/Node.js
             console.log('AuthHeaders - Using Eden AI Bearer token authentication (lowercase header)');
             headers['authorization'] = `Bearer ${apiKey}`;

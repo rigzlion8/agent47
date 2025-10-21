@@ -61,42 +61,77 @@ class ChatService {
             const editorContext = await this.getEditorContext();
             const fullContext = { ...context, ...editorContext };
             const headers = this.getAuthHeaders(backendUrl, apiKey);
-            // Use DeepSeek's chat completion endpoint
-            const endpoint = backendUrl.includes('deepseek.com')
-                ? `${backendUrl}/chat/completions`
-                : `${backendUrl}/api/code/analyze`;
-            const payload = backendUrl.includes('deepseek.com')
-                ? {
-                    model: 'deepseek-chat',
+            // Use appropriate endpoint based on backend URL
+            let endpoint;
+            if (backendUrl.includes('generativelanguage.googleapis.com')) {
+                endpoint = `${backendUrl}/models/${this.settingsManager.getModel()}:generateContent?key=${apiKey}`;
+            }
+            else if (backendUrl.includes('deepseek.com')) {
+                endpoint = `${backendUrl}/chat/completions`;
+            }
+            else {
+                endpoint = `${backendUrl}/api/code/analyze`;
+            }
+            let payload;
+            if (backendUrl.includes('generativelanguage.googleapis.com')) {
+                payload = {
+                    contents: [
+                        {
+                            parts: [
+                                {
+                                    text: `You are a helpful AI assistant that provides code analysis, suggestions, and improvements. Focus on performance, readability, and best practices. Please analyze this ${fullContext.language || 'typescript'} code:\n\n${message}\n\nProvide code analysis, suggestions, and improvements.`
+                                }
+                            ]
+                        }
+                    ],
+                    generationConfig: {
+                        temperature: 0.1,
+                        maxOutputTokens: 1000
+                    }
+                };
+            }
+            else if (backendUrl.includes('deepseek.com')) {
+                payload = {
+                    model: this.settingsManager.getModel(),
                     messages: [
                         {
-                            role: 'system',
-                            content: 'You are a helpful AI assistant that provides code analysis, suggestions, and improvements. Focus on performance, readability, and best practices.'
-                        },
-                        {
-                            role: 'user',
-                            content: `Please analyze this ${fullContext.language || 'typescript'} code:\n\n${message}\n\nProvide code analysis, suggestions, and improvements.`
+                            role: "user",
+                            content: `You are a helpful AI assistant that provides code analysis, suggestions, and improvements. Focus on performance, readability, and best practices. Please analyze this ${fullContext.language || 'typescript'} code:\n\n${message}\n\nProvide code analysis, suggestions, and improvements.`
                         }
                     ],
                     temperature: 0.1,
                     max_tokens: 1000
-                }
-                : {
+                };
+            }
+            else {
+                payload = {
                     code: message,
                     language: fullContext.language || 'typescript',
                     filePath: fullContext.filePath,
                     context: fullContext
                 };
+            }
             console.log('ChatService - Making request to:', endpoint);
             console.log('ChatService - Request headers:', headers);
             console.log('ChatService - Request payload:', payload);
+            console.log('ChatService - Backend URL:', backendUrl);
+            console.log('ChatService - Model:', this.settingsManager.getModel());
             const response = await axios_1.default.post(endpoint, payload, {
                 headers,
                 timeout: 30000 // 30 second timeout
             });
             console.log('ChatService - Response status:', response.status);
             console.log('ChatService - Response data:', response.data);
-            if (backendUrl.includes('deepseek.com')) {
+            if (backendUrl.includes('generativelanguage.googleapis.com')) {
+                // Handle Google Gemini response format
+                if (response.data && response.data.candidates && response.data.candidates[0] && response.data.candidates[0].content) {
+                    return response.data.candidates[0].content.parts[0].text;
+                }
+                else {
+                    throw new Error('Invalid response format from Google Gemini');
+                }
+            }
+            else if (backendUrl.includes('deepseek.com')) {
                 // Handle DeepSeek response format
                 if (response.data && response.data.choices && response.data.choices[0] && response.data.choices[0].message) {
                     return response.data.choices[0].message.content;
@@ -145,7 +180,17 @@ class ChatService {
                 throw new Error('Rate limit exceeded. Please try again later.');
             }
             else if (error.response?.data?.error) {
-                throw new Error(`Analysis service error: ${error.response.data.error}`);
+                // Handle Google Gemini error format
+                const errorData = error.response.data.error;
+                if (typeof errorData === 'object' && errorData.message) {
+                    throw new Error(`Google Gemini API error: ${errorData.message}`);
+                }
+                else if (typeof errorData === 'string') {
+                    throw new Error(`Analysis service error: ${errorData}`);
+                }
+                else {
+                    throw new Error(`Analysis service error: ${JSON.stringify(errorData)}`);
+                }
             }
             else {
                 throw new Error(`Failed to send message: ${error.message}`);
@@ -212,7 +257,13 @@ class ChatService {
         console.log('AuthHeaders - Backend URL:', backendUrl);
         console.log('AuthHeaders - API Key length:', apiKey.length);
         // Handle different authentication schemes based on backend URL
-        if (backendUrl.includes('deepseek.com')) {
+        if (backendUrl.includes('generativelanguage.googleapis.com')) {
+            // Google Gemini uses query parameter for API key
+            console.log('AuthHeaders - Using Google Gemini API key authentication');
+            // Note: Google Gemini API key is typically passed as a query parameter, not header
+            // We'll handle this in the endpoint URL construction
+        }
+        else if (backendUrl.includes('deepseek.com')) {
             // DeepSeek uses standard Authorization header with Bearer token
             console.log('AuthHeaders - Using DeepSeek Bearer token authentication');
             headers['Authorization'] = `Bearer ${apiKey}`;

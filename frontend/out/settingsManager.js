@@ -38,9 +38,9 @@ class SettingsManager {
     }
     getSettings() {
         return {
-            backendUrl: this.configuration.get('backendUrl') || 'https://api.deepseek.com',
+            backendUrl: this.configuration.get('backendUrl') || 'https://api.deepseek.com/v1',
             apiKey: this.configuration.get('apiKey'),
-            model: this.configuration.get('model') || 'gpt-3.5-turbo',
+            model: this.configuration.get('model') || 'deepseek-chat',
             autoAnalyze: this.configuration.get('autoAnalyze') || false,
             excludedPatterns: this.configuration.get('excludedPatterns') || [
                 '**/node_modules/**',
@@ -93,9 +93,9 @@ class SettingsManager {
     }
     getDefaultSettings() {
         return {
-            backendUrl: 'https://api.deepseek.com',
+            backendUrl: 'https://api.deepseek.com/v1',
             apiKey: undefined,
-            model: 'gpt-3.5-turbo',
+            model: 'deepseek-chat',
             autoAnalyze: false,
             excludedPatterns: [
                 '**/node_modules/**',

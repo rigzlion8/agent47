@@ -116,21 +116,23 @@ class SettingsWebview {
                     id="model"
                     class="w-full px-3 py-2 bg-vscode-input-background text-vscode-input-foreground border border-vscode-border rounded focus:outline-none focus:border-vscode-focus-border"
                   >
+                    <option value="deepseek-chat" ${settings.model === 'deepseek-chat' ? 'selected' : ''}>DeepSeek Chat</option>
+                    <option value="deepseek-coder" ${settings.model === 'deepseek-coder' ? 'selected' : ''}>DeepSeek Coder</option>
                     <option value="gpt-3.5-turbo" ${settings.model === 'gpt-3.5-turbo' ? 'selected' : ''}>GPT-3.5 Turbo</option>
                     <option value="gpt-4" ${settings.model === 'gpt-4' ? 'selected' : ''}>GPT-4</option>
                     <option value="gpt-4-turbo" ${settings.model === 'gpt-4-turbo' ? 'selected' : ''}>GPT-4 Turbo</option>
                     <option value="claude-3-opus" ${settings.model === 'claude-3-opus' ? 'selected' : ''}>Claude 3 Opus</option>
                     <option value="claude-3-sonnet" ${settings.model === 'claude-3-sonnet' ? 'selected' : ''}>Claude 3 Sonnet</option>
                     <option value="claude-3-haiku" ${settings.model === 'claude-3-haiku' ? 'selected' : ''}>Claude 3 Haiku</option>
-                    <option value="custom" ${!['gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo', 'claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku'].includes(settings.model) ? 'selected' : ''}>Custom Model</option>
+                    <option value="custom" ${!['deepseek-chat', 'deepseek-coder', 'gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo', 'claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku'].includes(settings.model) ? 'selected' : ''}>Custom Model</option>
                   </select>
                 </div>
 
-                <div id="customModelContainer" style="${!['gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo', 'claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku'].includes(settings.model) ? '' : 'display: none;'}">
+                <div id="customModelContainer" style="${!['deepseek-chat', 'deepseek-coder', 'gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo', 'claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku'].includes(settings.model) ? '' : 'display: none;'}">
                   <label class="block text-sm font-medium mb-2">Custom Model Name</label>
                   <input
                     type="text"
-                    value="${!['gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo', 'claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku'].includes(settings.model) ? settings.model : ''}"
+                    value="${!['deepseek-chat', 'deepseek-coder', 'gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo', 'claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku'].includes(settings.model) ? settings.model : ''}"
                     class="w-full px-3 py-2 bg-vscode-input-background text-vscode-input-foreground border border-vscode-border rounded focus:outline-none focus:border-vscode-focus-border"
                     id="customModel"
                     placeholder="Enter custom model name"
@@ -305,7 +307,7 @@ class SettingsWebview {
     }
     async resetSettings() {
         const configuration = vscode.workspace.getConfiguration('codeImprover');
-        await configuration.update('backendUrl', 'http://localhost:3000', vscode.ConfigurationTarget.Global);
+        await configuration.update('backendUrl', 'https://api.deepseek.com/v1', vscode.ConfigurationTarget.Global);
         await configuration.update('apiKey', undefined, vscode.ConfigurationTarget.Global);
         await configuration.update('autoAnalyze', false, vscode.ConfigurationTarget.Global);
         // ... reset other settings
