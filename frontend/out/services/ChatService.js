@@ -34,10 +34,28 @@ class ChatService {
         this.settingsManager = settingsManager;
     }
     async sendMessage(message, context) {
+        const maxRetries = 3;
+        const retryDelay = 1000; // 1 second
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                return await this.sendMessageWithRetry(message, context, attempt);
+            }
+            catch (error) {
+                // If it's the last attempt or the error is not retryable, throw the error
+                if (attempt === maxRetries || !this.isRetryableError(error)) {
+                    throw error;
+                }
+                console.log(`Retry attempt ${attempt}/${maxRetries} after error:`, error.message);
+                await new Promise(resolve => setTimeout(resolve, retryDelay * attempt));
+            }
+        }
+        throw new Error('All retry attempts failed');
+    }
+    async sendMessageWithRetry(message, context, attempt = 1) {
         const backendUrl = this.settingsManager.getBackendUrl();
         const apiKey = this.settingsManager.getApiKey();
         // Debug logging for API key and backend URL
-        console.log('=== CHAT SERVICE DEBUG ===');
+        console.log(`=== CHAT SERVICE DEBUG (Attempt ${attempt}) ===`);
         console.log('ChatService - Backend URL:', backendUrl);
         console.log('ChatService - API Key present:', !!apiKey);
         if (apiKey) {
@@ -116,52 +134,70 @@ class ChatService {
             console.log('ChatService - Request payload:', payload);
             console.log('ChatService - Backend URL:', backendUrl);
             console.log('ChatService - Model:', this.settingsManager.getModel());
-            const response = await axios_1.default.post(endpoint, payload, {
-                headers,
-                timeout: 30000 // 30 second timeout
-            });
-            console.log('ChatService - Response status:', response.status);
-            console.log('ChatService - Response data:', response.data);
-            if (backendUrl.includes('generativelanguage.googleapis.com')) {
-                // Handle Google Gemini response format
-                if (response.data && response.data.candidates && response.data.candidates[0] && response.data.candidates[0].content) {
-                    return response.data.candidates[0].content.parts[0].text;
+            // Create axios instance with better timeout and cancellation handling
+            const source = axios_1.default.CancelToken.source();
+            const timeout = setTimeout(() => {
+                source.cancel('Request timeout after 30 seconds');
+            }, 30000);
+            try {
+                const response = await axios_1.default.post(endpoint, payload, {
+                    headers,
+                    cancelToken: source.token,
+                    timeout: 30000 // 30 second timeout
+                });
+                clearTimeout(timeout);
+                console.log('ChatService - Response status:', response.status);
+                console.log('ChatService - Response data:', response.data);
+                if (backendUrl.includes('generativelanguage.googleapis.com')) {
+                    // Handle Google Gemini response format
+                    if (response.data && response.data.candidates && response.data.candidates[0] && response.data.candidates[0].content) {
+                        return response.data.candidates[0].content.parts[0].text;
+                    }
+                    else {
+                        throw new Error('Invalid response format from Google Gemini');
+                    }
+                }
+                else if (backendUrl.includes('deepseek.com')) {
+                    // Handle DeepSeek response format
+                    if (response.data && response.data.choices && response.data.choices[0] && response.data.choices[0].message) {
+                        return response.data.choices[0].message.content;
+                    }
+                    else {
+                        throw new Error('Invalid response format from DeepSeek');
+                    }
+                }
+                else if (backendUrl.includes('edenai.run')) {
+                    // Handle Eden AI response format
+                    if (response.data && response.data.openai && response.data.openai.generated_text) {
+                        return response.data.openai.generated_text;
+                    }
+                    else {
+                        throw new Error('Invalid response format from Eden AI');
+                    }
                 }
                 else {
-                    throw new Error('Invalid response format from Google Gemini');
+                    if (response.data && response.data.analysisId) {
+                        // For now, return a placeholder response since we need to handle async analysis
+                        return "Your code analysis has been queued. The backend will process it and provide suggestions shortly.";
+                    }
+                    else {
+                        throw new Error('Invalid response format from analysis service');
+                    }
                 }
+                return this.handleResponse(response.data, backendUrl);
             }
-            else if (backendUrl.includes('deepseek.com')) {
-                // Handle DeepSeek response format
-                if (response.data && response.data.choices && response.data.choices[0] && response.data.choices[0].message) {
-                    return response.data.choices[0].message.content;
-                }
-                else {
-                    throw new Error('Invalid response format from DeepSeek');
-                }
-            }
-            else if (backendUrl.includes('edenai.run')) {
-                // Handle Eden AI response format
-                if (response.data && response.data.openai && response.data.openai.generated_text) {
-                    return response.data.openai.generated_text;
-                }
-                else {
-                    throw new Error('Invalid response format from Eden AI');
-                }
-            }
-            else {
-                if (response.data && response.data.analysisId) {
-                    // For now, return a placeholder response since we need to handle async analysis
-                    return "Your code analysis has been queued. The backend will process it and provide suggestions shortly.";
-                }
-                else {
-                    throw new Error('Invalid response format from analysis service');
-                }
+            catch (error) {
+                clearTimeout(timeout);
+                throw error;
             }
         }
         catch (error) {
             console.error('Chat service error:', error);
             console.error('Chat service error response:', error.response?.data);
+            // Handle axios cancellation specifically
+            if (axios_1.default.isCancel(error)) {
+                throw new Error('Request was cancelled due to timeout. Please try again.');
+            }
             if (error.code === 'ECONNREFUSED') {
                 throw new Error('Unable to connect to the analysis service. Please check if the backend server is running.');
             }
@@ -191,6 +227,9 @@ class ChatService {
                 else {
                     throw new Error(`Analysis service error: ${JSON.stringify(errorData)}`);
                 }
+            }
+            else if (error.message?.includes('aborted') || error.message?.includes('cancel')) {
+                throw new Error('Request was cancelled. This might be due to network issues or timeout. Please try again.');
             }
             else {
                 throw new Error(`Failed to send message: ${error.message}`);
@@ -245,6 +284,44 @@ class ChatService {
             ...context
         });
     }
+    handleResponse(responseData, backendUrl) {
+        if (backendUrl.includes('generativelanguage.googleapis.com')) {
+            // Handle Google Gemini response format
+            if (responseData && responseData.candidates && responseData.candidates[0] && responseData.candidates[0].content) {
+                return responseData.candidates[0].content.parts[0].text;
+            }
+            else {
+                throw new Error('Invalid response format from Google Gemini');
+            }
+        }
+        else if (backendUrl.includes('deepseek.com')) {
+            // Handle DeepSeek response format
+            if (responseData && responseData.choices && responseData.choices[0] && responseData.choices[0].message) {
+                return responseData.choices[0].message.content;
+            }
+            else {
+                throw new Error('Invalid response format from DeepSeek');
+            }
+        }
+        else if (backendUrl.includes('edenai.run')) {
+            // Handle Eden AI response format
+            if (responseData && responseData.openai && responseData.openai.generated_text) {
+                return responseData.openai.generated_text;
+            }
+            else {
+                throw new Error('Invalid response format from Eden AI');
+            }
+        }
+        else {
+            if (responseData && responseData.analysisId) {
+                // For now, return a placeholder response since we need to handle async analysis
+                return "Your code analysis has been queued. The backend will process it and provide suggestions shortly.";
+            }
+            else {
+                throw new Error('Invalid response format from analysis service');
+            }
+        }
+    }
     getAuthHeaders(backendUrl, apiKey) {
         const headers = {
             'Content-Type': 'application/json'
@@ -291,6 +368,26 @@ class ChatService {
         }
         console.log('AuthHeaders - Final headers:', Object.keys(headers));
         return headers;
+    }
+    isRetryableError(error) {
+        // Retry on network errors, timeouts, and server errors (5xx)
+        if (axios_1.default.isCancel(error)) {
+            return true; // Timeout or cancellation
+        }
+        if (error.code === 'ECONNREFUSED' || error.code === 'ETIMEDOUT') {
+            return true; // Network connectivity issues
+        }
+        if (error.response?.status >= 500) {
+            return true; // Server errors
+        }
+        if (error.message?.includes('aborted') || error.message?.includes('cancel')) {
+            return true; // Request aborted
+        }
+        // Don't retry on client errors (4xx) except 429 (rate limit)
+        if (error.response?.status === 429) {
+            return true; // Rate limit - wait and retry
+        }
+        return false;
     }
     dispose() {
         // Clean up any resources if needed
