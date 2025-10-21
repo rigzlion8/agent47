@@ -94,6 +94,12 @@ export class ChatPanel {
           case 'documentCode':
             await this.handleCodeDocumentation(message.code, message.language, message.documentationType, message.context);
             break;
+          case 'showContentMenu':
+            await this.showContentMenu();
+            break;
+          case 'showCommandMenu':
+            await this.showCommandMenu();
+            break;
         }
       },
       null,
@@ -122,6 +128,14 @@ You can also select code in your editor and ask me about it directly!`,
   }
 
   private async handleUserMessage(content: string, codeContext?: any) {
+    // Check if the message contains file references and handle them
+    const fileAnalysisResult = await this.detectAndHandleFileReferences(content, codeContext);
+    
+    if (fileAnalysisResult.handled) {
+      // File reference was handled, don't proceed with regular message
+      return;
+    }
+
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
@@ -172,6 +186,135 @@ You can also select code in your editor and ask me about it directly!`,
       this.messages.push(errorMessage);
       this.updateWebview();
     }
+  }
+
+  private async detectAndHandleFileReferences(content: string, codeContext?: any): Promise<{ handled: boolean }> {
+    // Detect file references in the message
+    const fileReferences = this.extractFileReferences(content);
+    
+    if (fileReferences.length === 0) {
+      return { handled: false };
+    }
+
+    // Handle the first file reference found
+    const filePath = await this.resolveFilePath(fileReferences[0]);
+    
+    if (!filePath) {
+      // File not found, show error
+      const errorMessage: ChatMessage = {
+        id: Date.now().toString(),
+        role: 'assistant',
+        content: `I couldn't find the file "${fileReferences[0]}". Please make sure the file exists in your workspace.`,
+        timestamp: new Date()
+      };
+      this.messages.push(errorMessage);
+      this.updateWebview();
+      return { handled: true };
+    }
+
+    // Determine the operation type based on the message content
+    const operationType = this.determineOperationType(content);
+    
+    switch (operationType) {
+      case 'analyze':
+        await this.handleCodeReading(filePath, codeContext);
+        break;
+      case 'read':
+        await this.handleCodeReading(filePath, codeContext);
+        break;
+      case 'review':
+        await this.handleCodeReading(filePath, codeContext);
+        break;
+      default:
+        // Default to reading and analyzing
+        await this.handleCodeReading(filePath, codeContext);
+        break;
+    }
+
+    return { handled: true };
+  }
+
+  private extractFileReferences(content: string): string[] {
+    const filePatterns = [
+      // Match file names with extensions
+      /\b(\w+\.(ts|js|tsx|jsx|py|java|cpp|c|cs|php|rb|go|rs|swift|kt|html|css|scss|json|xml|yaml|yml))\b/gi,
+      // Match file paths with extensions
+      /[\w\/\-\.]+\.(ts|js|tsx|jsx|py|java|cpp|c|cs|php|rb|go|rs|swift|kt|html|css|scss|json|xml|yaml|yml)/gi,
+      // Match quoted file names
+      /["']([^"']+\.[^"']+)["']/gi
+    ];
+
+    const references: string[] = [];
+    
+    for (const pattern of filePatterns) {
+      const matches = content.match(pattern);
+      if (matches) {
+        references.push(...matches);
+      }
+    }
+
+    return [...new Set(references)]; // Remove duplicates
+  }
+
+  private async resolveFilePath(fileReference: string): Promise<string | null> {
+    try {
+      // Clean the file reference (remove quotes, etc.)
+      const cleanReference = fileReference.replace(/["']/g, '');
+      
+      // Check if it's an absolute path
+      if (cleanReference.startsWith('/') || cleanReference.includes(':\\')) {
+        return cleanReference;
+      }
+
+      // Check if file exists in workspace
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders) {
+        return null;
+      }
+
+      // Search for the file in workspace
+      const files = await vscode.workspace.findFiles(`**/${cleanReference}`, null, 1);
+      
+      if (files.length > 0) {
+        return files[0].fsPath;
+      }
+
+      // Check if it's the current active file
+      const editor = vscode.window.activeTextEditor;
+      if (editor) {
+        const currentFileName = editor.document.fileName.split('/').pop();
+        if (currentFileName === cleanReference) {
+          return editor.document.fileName;
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error resolving file path:', error);
+      return null;
+    }
+  }
+
+  private determineOperationType(content: string): string {
+    const lowerContent = content.toLowerCase();
+    
+    if (lowerContent.includes('analyze') || lowerContent.includes('analysis')) {
+      return 'analyze';
+    } else if (lowerContent.includes('read') || lowerContent.includes('understand')) {
+      return 'read';
+    } else if (lowerContent.includes('review') || lowerContent.includes('code review')) {
+      return 'review';
+    } else if (lowerContent.includes('edit') || lowerContent.includes('modify')) {
+      return 'edit';
+    } else if (lowerContent.includes('refactor')) {
+      return 'refactor';
+    } else if (lowerContent.includes('optimize')) {
+      return 'optimize';
+    } else if (lowerContent.includes('document')) {
+      return 'document';
+    }
+    
+    return 'analyze'; // Default to analyze
   }
 
   private async sendCodeContext() {
@@ -782,9 +925,9 @@ You can also select code in your editor and ask me about it directly!`,
           
           <div class="input-area">
             <div class="input-container">
-              <textarea 
-                id="messageInput" 
-                placeholder="Ask me anything about your code..." 
+              <textarea
+                id="messageInput"
+                placeholder="Type a message...&#10;(@ to add content, / for commands, hold shift to drag in files)"
                 rows="3"
               ></textarea>
               <div class="buttons">
@@ -835,6 +978,96 @@ You can also select code in your editor and ask me about it directly!`,
             messageInput.value = '';
             messageInput.style.height = 'auto';
           }
+
+          // Handle file drag and drop
+          function handleFileDrop(event) {
+            event.preventDefault();
+            messageInput.style.border = '1px solid var(--vscode-input-border)';
+            
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+              const file = files[0];
+              
+              // Read the file content
+              const reader = new FileReader();
+              reader.onload = function(e) {
+                const fileContent = e.target.result;
+                const fileName = file.name;
+                
+                // Send file content to extension
+                vscode.postMessage({
+                  command: 'sendMessage',
+                  content: 'I\\'ve uploaded the file "' + fileName + '". Please analyze this code:\\n\\n' + fileContent,
+                  codeContext: {
+                    filePath: fileName,
+                    language: getLanguageFromExtension(fileName),
+                    selectedText: fileContent
+                  }
+                });
+              };
+              
+              reader.readAsText(file);
+            }
+          }
+
+          // Get language from file extension
+          function getLanguageFromExtension(fileName) {
+            const ext = fileName.split('.').pop().toLowerCase();
+            const languageMap = {
+              'js': 'javascript',
+              'ts': 'typescript',
+              'jsx': 'javascript',
+              'tsx': 'typescript',
+              'py': 'python',
+              'java': 'java',
+              'cpp': 'cpp',
+              'c': 'c',
+              'cs': 'csharp',
+              'php': 'php',
+              'rb': 'ruby',
+              'go': 'go',
+              'rs': 'rust',
+              'swift': 'swift',
+              'kt': 'kotlin',
+              'html': 'html',
+              'css': 'css',
+              'scss': 'scss',
+              'json': 'json',
+              'xml': 'xml',
+              'yaml': 'yaml',
+              'yml': 'yaml'
+            };
+            
+            return languageMap[ext] || 'unknown';
+          }
+
+          // Handle @ mentions for content
+          function handleAtMention() {
+            const cursorPos = messageInput.selectionStart;
+            const textBeforeCursor = messageInput.value.substring(0, cursorPos);
+            
+            // Check if user typed @
+            if (textBeforeCursor.endsWith('@')) {
+              // Show content selection menu
+              vscode.postMessage({
+                command: 'showContentMenu'
+              });
+            }
+          }
+
+          // Handle / commands
+          function handleSlashCommand() {
+            const cursorPos = messageInput.selectionStart;
+            const textBeforeCursor = messageInput.value.substring(0, cursorPos);
+            
+            // Check if user typed /
+            if (textBeforeCursor.endsWith('/')) {
+              // Show command menu
+              vscode.postMessage({
+                command: 'showCommandMenu'
+              });
+            }
+          }
           
           // Clear chat
           function clearChat() {
@@ -853,10 +1086,29 @@ You can also select code in your editor and ask me about it directly!`,
             settingsButton.addEventListener('click', openSettings);
           }
           
+          // Add drag and drop event listeners
+          messageInput.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            if (e.shiftKey) {
+              messageInput.style.border = '2px dashed var(--vscode-focusBorder)';
+            }
+          });
+          
+          messageInput.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            messageInput.style.border = '1px solid var(--vscode-input-border)';
+          });
+          
+          messageInput.addEventListener('drop', handleFileDrop);
+          
           messageInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
               sendMessage();
+            } else if (e.key === '@') {
+              handleAtMention();
+            } else if (e.key === '/') {
+              handleSlashCommand();
             }
           });
           
@@ -887,6 +1139,107 @@ You can also select code in your editor and ask me about it directly!`,
       </body>
       </html>
     `;
+  }
+
+  private async showContentMenu() {
+    // Show quick pick for content types
+    const contentTypes = [
+      'Current File',
+      'Selected Code',
+      'Workspace Files',
+      'Project Structure',
+      'Dependencies',
+      'Configuration Files'
+    ];
+    
+    const selected = await vscode.window.showQuickPick(contentTypes, {
+      placeHolder: 'Select content to add to context'
+    });
+    
+    if (selected) {
+      // Handle the selected content type
+      this.addContentToContext(selected);
+    }
+  }
+
+  private async showCommandMenu() {
+    // Show quick pick for commands
+    const commands = [
+      { label: 'Analyze Code', description: 'Analyze selected code for improvements' },
+      { label: 'Explain Code', description: 'Get detailed explanation of code' },
+      { label: 'Refactor Code', description: 'Refactor code using best practices' },
+      { label: 'Review Code', description: 'Perform code review' },
+      { label: 'Optimize Code', description: 'Optimize for performance' },
+      { label: 'Document Code', description: 'Generate documentation' },
+      { label: 'Debug Code', description: 'Help debug issues' },
+      { label: 'Generate Tests', description: 'Create test cases' }
+    ];
+    
+    const selected = await vscode.window.showQuickPick(commands, {
+      placeHolder: 'Select a command to execute'
+    });
+    
+    if (selected) {
+      // Handle the selected command
+      this.executeCommand(selected.label);
+    }
+  }
+
+  private async addContentToContext(contentType: string) {
+    // Implementation for adding content to context
+    const editor = vscode.window.activeTextEditor;
+    
+    switch (contentType) {
+      case 'Current File':
+        if (editor) {
+          const document = editor.document;
+          const content = document.getText();
+          // Add file content to context
+          this.panel.webview.postMessage({
+            command: 'addContent',
+            content: `Current file content:\n\n${content}`,
+            type: 'file'
+          });
+        }
+        break;
+      case 'Selected Code':
+        if (editor && !editor.selection.isEmpty) {
+          const selectedText = editor.document.getText(editor.selection);
+          this.panel.webview.postMessage({
+            command: 'addContent',
+            content: `Selected code:\n\n${selectedText}`,
+            type: 'selection'
+          });
+        }
+        break;
+      // Add other content types as needed
+    }
+  }
+
+  private async executeCommand(command: string) {
+    // Implementation for executing commands
+    const editor = vscode.window.activeTextEditor;
+    
+    switch (command) {
+      case 'Analyze Code':
+        if (editor) {
+          const document = editor.document;
+          const selection = editor.selection;
+          const code = selection.isEmpty ? document.getText() : document.getText(selection);
+          await this.handleCodeAnalysis(code, document.languageId);
+        }
+        break;
+      case 'Explain Code':
+        if (editor) {
+          const document = editor.document;
+          const selection = editor.selection;
+          const code = selection.isEmpty ? document.getText() : document.getText(selection);
+          // Send explanation request
+          await this.handleUserMessage(`Please explain this ${document.languageId} code:\n\n${code}`);
+        }
+        break;
+      // Add other command implementations as needed
+    }
   }
 
   private formatMessageContent(content: string): string {
