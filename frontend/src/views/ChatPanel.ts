@@ -100,6 +100,9 @@ export class ChatPanel {
           case 'showCommandMenu':
             await this.showCommandMenu();
             break;
+          case 'addContent':
+            await this.handleAddContent(message.content, message.type);
+            break;
         }
       },
       null,
@@ -1163,6 +1166,15 @@ You can also select code in your editor and ask me about it directly!`,
             if (message.command === 'codeContext') {
               // Store context for next message
               window.currentCodeContext = message.context;
+            } else if (message.command === 'insertContent') {
+              // Insert content into message input
+              if (messageInput) {
+                const currentValue = messageInput.value;
+                messageInput.value = currentValue + '\n' + message.content;
+                messageInput.style.height = 'auto';
+                messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
+                messageInput.focus();
+              }
             }
           });
           
@@ -1276,6 +1288,15 @@ You can also select code in your editor and ask me about it directly!`,
         break;
       // Add other command implementations as needed
     }
+  }
+
+  private async handleAddContent(content: string, type: string) {
+    // Add content to the current message input
+    this.panel.webview.postMessage({
+      command: 'insertContent',
+      content: content,
+      type: type
+    });
   }
 
   private formatMessageContent(content: string): string {

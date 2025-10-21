@@ -28,7 +28,7 @@ export class SettingsManager {
 
   getSettings(): ExtensionSettings {
     return {
-      backendUrl: this.configuration.get<string>('backendUrl') || 'https://api.deepseek.com/v1',
+      backendUrl: this.configuration.get<string>('backendUrl') || 'http://localhost:3006',
       apiKey: this.configuration.get<string>('apiKey'),
       model: this.configuration.get<string>('model') || 'deepseek-chat',
       autoAnalyze: this.configuration.get<boolean>('autoAnalyze') || false,
@@ -94,7 +94,7 @@ export class SettingsManager {
 
   private getDefaultSettings(): ExtensionSettings {
     return {
-      backendUrl: 'https://api.deepseek.com/v1',
+      backendUrl: 'http://localhost:3006',
       apiKey: undefined,
       model: 'deepseek-chat',
       autoAnalyze: false,
