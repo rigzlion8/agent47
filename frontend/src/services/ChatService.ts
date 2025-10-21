@@ -287,11 +287,35 @@ export class ChatService {
 
   public async readCode(filePath: string, context?: ChatContext): Promise<string> {
     try {
-      const fs = require('fs');
-      const code = fs.readFileSync(filePath, 'utf8');
+      const fs = require('fs').promises;
+      const path = require('path');
+      
+      // Check if file exists and get stats
+      const stats = await fs.stat(filePath);
+      const fileSizeInMB = stats.size / (1024 * 1024);
+      
+      // Warn about large files
+      if (fileSizeInMB > 1) {
+        console.warn(`Large file detected: ${filePath} (${fileSizeInMB.toFixed(2)} MB)`);
+      }
+      
+      // Read file asynchronously
+      const code = await fs.readFile(filePath, 'utf8');
       const language = this.getLanguageFromPath(filePath);
       
-      const prompt = `Please read and understand this ${language} code from file ${filePath}:\n\n${code}\n\nProvide a comprehensive understanding including:\n- Overall purpose and functionality\n- Key components and their relationships\n- Important functions and methods\n- Data flow and architecture\n- Dependencies and imports`;
+      // For large files, create a more focused prompt
+      let prompt;
+      if (fileSizeInMB > 0.5) {
+        // For larger files, focus on key parts
+        const lines = code.split('\n');
+        const sampleSize = Math.min(100, Math.floor(lines.length * 0.2)); // 20% or 100 lines max
+        const sampleCode = lines.slice(0, sampleSize).join('\n');
+        
+        prompt = `Please analyze this ${language} file (${filePath}). The file is ${fileSizeInMB.toFixed(2)} MB with approximately ${lines.length} lines.\n\nHere's a sample of the code:\n\n${sampleCode}\n\nPlease provide:\n- Overall purpose and architecture\n- Key components and patterns\n- Main functions and their purposes\n- Any notable code quality issues\n- Suggestions for improvement`;
+      } else {
+        // For smaller files, send the complete content
+        prompt = `Please read and understand this ${language} code from file ${filePath}:\n\n${code}\n\nProvide a comprehensive understanding including:\n- Overall purpose and functionality\n- Key components and their relationships\n- Important functions and methods\n- Data flow and architecture\n- Dependencies and imports\n- Code quality assessment`;
+      }
 
       return this.sendMessage(prompt, {
         language,
@@ -299,8 +323,14 @@ export class ChatService {
         fullDocument: code,
         ...context
       });
-    } catch (error) {
-      throw new Error(`Failed to read file ${filePath}: ${error}`);
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        throw new Error(`File not found: ${filePath}`);
+      } else if (error.code === 'EACCES') {
+        throw new Error(`Permission denied: ${filePath}`);
+      } else {
+        throw new Error(`Failed to read file ${filePath}: ${error.message}`);
+      }
     }
   }
 

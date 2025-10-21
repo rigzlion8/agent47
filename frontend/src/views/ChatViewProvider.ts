@@ -242,11 +242,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         return null;
       }
 
-      // Search for the file in workspace
-      const files = await vscode.workspace.findFiles(`**/${cleanReference}`, null, 1);
+      // Search for the file in workspace with multiple patterns
+      const patterns = [
+        `**/${cleanReference}`,
+        `**/${cleanReference}.*`,
+        `**/*${cleanReference}*`
+      ];
       
-      if (files.length > 0) {
-        return files[0].fsPath;
+      for (const pattern of patterns) {
+        const files = await vscode.workspace.findFiles(pattern, null, 1);
+        if (files.length > 0) {
+          return files[0].fsPath;
+        }
       }
 
       // Check if it's the current active file
@@ -255,6 +262,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         const currentFileName = editor.document.fileName.split('/').pop();
         if (currentFileName === cleanReference) {
           return editor.document.fileName;
+        }
+      }
+
+      // Check if file exists relative to current workspace
+      for (const folder of workspaceFolders) {
+        const potentialPath = require('path').join(folder.uri.fsPath, cleanReference);
+        try {
+          await vscode.workspace.fs.stat(vscode.Uri.file(potentialPath));
+          return potentialPath;
+        } catch {
+          // File doesn't exist at this path, continue searching
         }
       }
 
