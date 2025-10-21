@@ -1,7 +1,7 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import { User } from '../models/User';
-import { auth } from '../middleware/auth';
+import { auth, AuthRequest } from '../middleware/auth';
 
 const router = express.Router();
 
@@ -94,7 +94,7 @@ router.post('/login', async (req, res) => {
 // These would be more complex and require OAuth client setup
 
 // Get current user
-router.get('/me', auth, async (req, res) => {
+router.get('/me', auth, async (req: AuthRequest, res) => {
   try {
     const user = await User.findById(req.user?.userId);
     if (!user) {
@@ -119,7 +119,7 @@ router.get('/me', auth, async (req, res) => {
 });
 
 // Update API key
-router.put('/api-key', auth, async (req, res) => {
+router.put('/api-key', auth, async (req: AuthRequest, res) => {
   try {
     const { apiKey } = req.body;
     const user = await User.findById(req.user?.userId);

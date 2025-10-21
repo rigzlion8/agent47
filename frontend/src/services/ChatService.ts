@@ -42,23 +42,27 @@ export class ChatService {
     const backendUrl = this.settingsManager.getBackendUrl();
     const apiKey = this.settingsManager.getApiKey();
 
-    // Debug logging for API key and backend URL
-    console.log(`=== CHAT SERVICE DEBUG (Attempt ${attempt}) ===`);
-    console.log('ChatService - Backend URL:', backendUrl);
-    console.log('ChatService - API Key present:', !!apiKey);
+    console.log(`=== CHAT SERVICE REQUEST (Attempt ${attempt}) ===`);
+    console.log(`Message length: ${message.length} characters`);
+    console.log(`Context:`, context ? {
+      filePath: context.filePath,
+      language: context.language,
+      hasSelectedText: !!context.selectedText,
+      hasFullDocument: !!context.fullDocument
+    } : 'No context');
+    
+    console.log('Backend URL:', backendUrl);
+    console.log('API Key present:', !!apiKey);
     if (apiKey) {
-      console.log('ChatService - API Key length:', apiKey.length);
-      console.log('ChatService - API Key starts with:', apiKey.substring(0, 4) + '...');
-      console.log('ChatService - API Key ends with:', '...' + apiKey.substring(apiKey.length - 4));
-      console.log('ChatService - API Key value (first 10 chars):', apiKey.substring(0, 10) + '...');
+      console.log('API Key length:', apiKey.length);
+      console.log('API Key starts with:', apiKey.substring(0, 4) + '...');
+      console.log('API Key ends with:', '...' + apiKey.substring(apiKey.length - 4));
     } else {
-      console.log('ChatService - NO API KEY FOUND!');
-      console.log('ChatService - All settings:', this.settingsManager.getSettings());
-      console.log('ChatService - SettingsManager instance:', this.settingsManager);
+      console.log('NO API KEY FOUND!');
+      console.log('All settings:', this.settingsManager.getSettings());
     }
 
     if (!apiKey) {
-      // For development, allow requests without API key but show a warning
       console.warn('API key not configured. Some features may not work properly.');
       // Continue without API key for now
     }
@@ -118,11 +122,12 @@ export class ChatService {
         };
       }
 
-      console.log('ChatService - Making request to:', endpoint);
-      console.log('ChatService - Request headers:', headers);
-      console.log('ChatService - Request payload:', payload);
-      console.log('ChatService - Backend URL:', backendUrl);
-      console.log('ChatService - Model:', this.settingsManager.getModel());
+      console.log(`=== MAKING REQUEST TO BACKEND ===`);
+      console.log('Endpoint:', endpoint);
+      console.log('Headers:', Object.keys(headers));
+      console.log('Payload keys:', Object.keys(payload));
+      console.log('Model:', this.settingsManager.getModel());
+      console.log('Timeout: 30 seconds');
 
       // Create axios instance with better timeout and cancellation handling
       const source = axios.CancelToken.source();
@@ -139,8 +144,10 @@ export class ChatService {
 
         clearTimeout(timeout);
 
-      console.log('ChatService - Response status:', response.status);
-      console.log('ChatService - Response data:', response.data);
+      console.log(`=== BACKEND RESPONSE RECEIVED ===`);
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+      console.log('Response data keys:', Object.keys(response.data));
 
       if (backendUrl.includes('generativelanguage.googleapis.com')) {
         // Handle Google Gemini response format
@@ -177,8 +184,13 @@ export class ChatService {
         throw error;
       }
     } catch (error: any) {
-      console.error('Chat service error:', error);
-      console.error('Chat service error response:', error.response?.data);
+      console.error(`=== BACKEND REQUEST ERROR (Attempt ${attempt}) ===`);
+      console.error('Error type:', error.constructor.name);
+      console.error('Error message:', error.message);
+      console.error('Error code:', error.code);
+      console.error('Error response status:', error.response?.status);
+      console.error('Error response data:', error.response?.data);
+      console.error('Error stack:', error.stack);
       
       // Handle axios cancellation specifically
       if (axios.isCancel(error)) {
@@ -286,13 +298,19 @@ export class ChatService {
   }
 
   public async readCode(filePath: string, context?: ChatContext): Promise<string> {
+    console.log(`=== READ CODE START: ${filePath} ===`);
     try {
       const fs = require('fs').promises;
       const path = require('path');
       
+      console.log(`Reading file: ${filePath}`);
+      
       // Check if file exists and get stats
       const stats = await fs.stat(filePath);
       const fileSizeInMB = stats.size / (1024 * 1024);
+      const fileSizeInKB = stats.size / 1024;
+      
+      console.log(`File stats - Size: ${fileSizeInKB.toFixed(2)} KB (${fileSizeInMB.toFixed(2)} MB)`);
       
       // Warn about large files
       if (fileSizeInMB > 1) {
@@ -300,8 +318,12 @@ export class ChatService {
       }
       
       // Read file asynchronously
+      console.log(`Starting file read...`);
       const code = await fs.readFile(filePath, 'utf8');
+      console.log(`File read completed. Content length: ${code.length} characters`);
+      
       const language = this.getLanguageFromPath(filePath);
+      console.log(`Detected language: ${language}`);
       
       // For large files, create a more focused prompt
       let prompt;
@@ -311,19 +333,31 @@ export class ChatService {
         const sampleSize = Math.min(100, Math.floor(lines.length * 0.2)); // 20% or 100 lines max
         const sampleCode = lines.slice(0, sampleSize).join('\n');
         
+        console.log(`Large file detected. Using sample: ${sampleSize} lines out of ${lines.length} total`);
+        
         prompt = `Please analyze this ${language} file (${filePath}). The file is ${fileSizeInMB.toFixed(2)} MB with approximately ${lines.length} lines.\n\nHere's a sample of the code:\n\n${sampleCode}\n\nPlease provide:\n- Overall purpose and architecture\n- Key components and patterns\n- Main functions and their purposes\n- Any notable code quality issues\n- Suggestions for improvement`;
       } else {
         // For smaller files, send the complete content
+        console.log(`Small file. Sending complete content.`);
         prompt = `Please read and understand this ${language} code from file ${filePath}:\n\n${code}\n\nProvide a comprehensive understanding including:\n- Overall purpose and functionality\n- Key components and their relationships\n- Important functions and methods\n- Data flow and architecture\n- Dependencies and imports\n- Code quality assessment`;
       }
 
-      return this.sendMessage(prompt, {
+      console.log(`Prompt length: ${prompt.length} characters`);
+      console.log(`Calling sendMessage with file context...`);
+      
+      const result = await this.sendMessage(prompt, {
         language,
         filePath,
         fullDocument: code,
         ...context
       });
+      
+      console.log(`=== READ CODE SUCCESS: ${filePath} ===`);
+      return result;
     } catch (error: any) {
+      console.error(`=== READ CODE ERROR: ${filePath} ===`);
+      console.error(`Error details:`, error);
+      
       if (error.code === 'ENOENT') {
         throw new Error(`File not found: ${filePath}`);
       } else if (error.code === 'EACCES') {

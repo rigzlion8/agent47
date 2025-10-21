@@ -92,7 +92,7 @@ router.get('/analysis/:id', auth, async (req: AuthRequest, res) => {
       status: analysis.status,
       suggestions: analysis.suggestions,
       analysisTime: analysis.analysisTime,
-      createdAt: analysis.createdAt
+      createdAt: (analysis as any).createdAt
     });
 
   } catch (error) {

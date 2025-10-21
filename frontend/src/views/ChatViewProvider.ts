@@ -227,21 +227,27 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
   }
 
   private async resolveFilePath(fileReference: string): Promise<string | null> {
+    console.log(`=== RESOLVING FILE PATH: "${fileReference}" ===`);
     try {
       // Clean the file reference (remove quotes, etc.)
       const cleanReference = fileReference.replace(/["']/g, '');
+      console.log(`Cleaned reference: "${cleanReference}"`);
       
       // Check if it's an absolute path
       if (cleanReference.startsWith('/') || cleanReference.includes(':\\')) {
+        console.log(`Absolute path detected: ${cleanReference}`);
         return cleanReference;
       }
 
       // Check if file exists in workspace
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (!workspaceFolders) {
+        console.log('No workspace folders found');
         return null;
       }
 
+      console.log(`Workspace folders: ${workspaceFolders.length}`);
+      
       // Search for the file in workspace with multiple patterns
       const patterns = [
         `**/${cleanReference}`,
@@ -249,10 +255,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         `**/*${cleanReference}*`
       ];
       
+      console.log(`Search patterns:`, patterns);
+      
       for (const pattern of patterns) {
+        console.log(`Searching with pattern: ${pattern}`);
         const files = await vscode.workspace.findFiles(pattern, null, 1);
+        console.log(`Found ${files.length} files with pattern ${pattern}`);
         if (files.length > 0) {
-          return files[0].fsPath;
+          const resolvedPath = files[0].fsPath;
+          console.log(`Resolved file path: ${resolvedPath}`);
+          return resolvedPath;
         }
       }
 
@@ -260,7 +272,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       const editor = vscode.window.activeTextEditor;
       if (editor) {
         const currentFileName = editor.document.fileName.split('/').pop();
+        console.log(`Current active file: ${currentFileName}`);
         if (currentFileName === cleanReference) {
+          console.log(`Matched current active file: ${editor.document.fileName}`);
           return editor.document.fileName;
         }
       }
@@ -268,14 +282,18 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       // Check if file exists relative to current workspace
       for (const folder of workspaceFolders) {
         const potentialPath = require('path').join(folder.uri.fsPath, cleanReference);
+        console.log(`Checking relative path: ${potentialPath}`);
         try {
           await vscode.workspace.fs.stat(vscode.Uri.file(potentialPath));
+          console.log(`Found file at relative path: ${potentialPath}`);
           return potentialPath;
         } catch {
           // File doesn't exist at this path, continue searching
+          console.log(`File not found at relative path: ${potentialPath}`);
         }
       }
 
+      console.log(`File not found: ${cleanReference}`);
       return null;
     } catch (error) {
       console.error('Error resolving file path:', error);

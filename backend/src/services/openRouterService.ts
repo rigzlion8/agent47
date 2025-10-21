@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { AnalysisRequest, Suggestion } from '../../../shared/types';
+import { AnalysisRequest, Suggestion } from '../types/shared';
 
 export class OpenRouterService {
   private apiKey: string;

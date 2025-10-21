@@ -1,7 +1,7 @@
 import { CodeAnalysis } from '../models/CodeAnalysis';
 import { User } from '../models/User';
 import { OpenRouterService } from './openRouterService';
-import { AnalysisRequest } from '../../../shared/types';
+import { AnalysisRequest } from '../types/shared';
 
 interface QueueItem {
   analysisId: string;
@@ -18,9 +18,6 @@ export class AnalysisQueue {
   private maxRetries = 3;
   private retryDelay = 5000; // 5 seconds
 
-  constructor() {
-    this.startProcessor();
-  }
 
   async addToQueue(analysisId: string, request: AnalysisRequest): Promise<void> {
     const queueItem: QueueItem = {

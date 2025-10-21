@@ -1,9 +1,8 @@
 {
   "name": "code-improver-backend",
   "version": "1.0.0",
-  "type": "module",
   "scripts": {
-    "dev": "nodemon src/server.ts",
+    "dev": "npm run build && node dist/server.js",
     "build": "tsc",
     "start": "node dist/server.js"
   },
