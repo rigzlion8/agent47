@@ -5,6 +5,7 @@ import { SuggestionPanel } from './views/SuggestionPanel';
 import { FileIndexer } from './services/FileIndexer';
 import axios from './utils/axiosConfig';
 import { Suggestion } from './types/shared';
+import { AuthUtils } from './utils/authUtils';
 
 export class CodeImprover {
   private settingsManager: SettingsManager;
@@ -68,7 +69,7 @@ export class CodeImprover {
             return;
           }
 
-          const headers = this.getAuthHeaders(backendUrl, apiKey);
+          const headers = AuthUtils.getAuthHeaders(backendUrl, apiKey);
           
           // Use appropriate endpoint based on backend URL
           let endpoint;
@@ -167,7 +168,10 @@ export class CodeImprover {
           console.error('Analysis error response:', error.response?.data);
           
           let errorMessage = error.message;
-          if (error.response?.data?.error) {
+          if (error.response?.status === 401) {
+            AuthUtils.showAuthError();
+            errorMessage = 'Authentication failed: Invalid or expired API token';
+          } else if (error.response?.data?.error) {
             // Handle Google Gemini error format
             const errorData = error.response.data.error;
             if (typeof errorData === 'object' && errorData.message) {
@@ -177,11 +181,13 @@ export class CodeImprover {
             } else {
               errorMessage = `Analysis service error: ${JSON.stringify(errorData)}`;
             }
+            vscode.window.showErrorMessage(`Analysis failed: ${errorMessage}`);
           } else if (error.response?.data) {
             errorMessage = `Analysis service error: ${JSON.stringify(error.response.data)}`;
+            vscode.window.showErrorMessage(`Analysis failed: ${errorMessage}`);
+          } else {
+            vscode.window.showErrorMessage(`Analysis failed: ${errorMessage}`);
           }
-          
-          vscode.window.showErrorMessage(`Analysis failed: ${errorMessage}`);
         }
       });
 
@@ -224,7 +230,7 @@ export class CodeImprover {
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        const headers = this.getAuthHeaders(backendUrl, apiKey);
+        const headers = AuthUtils.getAuthHeaders(backendUrl, apiKey);
         const response = await axios.get(`${backendUrl}/api/code/analysis/${analysisId}`, {
           headers
         });
@@ -250,46 +256,6 @@ export class CodeImprover {
     return null;
   }
 
-  private getAuthHeaders(backendUrl: string, apiKey: string | undefined): Record<string, string> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-
-    if (!apiKey) {
-      console.warn('No API key provided for authentication');
-      return headers;
-    }
-
-    // Debug logging for authentication
-    console.log('AuthHeaders - Backend URL:', backendUrl);
-    console.log('AuthHeaders - API Key length:', apiKey.length);
-
-    // Handle different authentication schemes based on backend URL
-    if (backendUrl.includes('generativelanguage.googleapis.com')) {
-      // Google Gemini uses query parameter for API key, no special headers needed
-      console.log('AuthHeaders - Using Google Gemini API key authentication (via query parameter)');
-    } else if (backendUrl.includes('edenai.run') || backendUrl.includes('edenai')) {
-      // Eden AI uses lowercase 'authorization' header for JavaScript/Node.js
-      console.log('AuthHeaders - Using Eden AI Bearer token authentication (lowercase header)');
-      headers['authorization'] = `Bearer ${apiKey}`;
-    } else if (backendUrl.includes('openai.com')) {
-      // OpenAI uses Bearer tokens
-      console.log('AuthHeaders - Using OpenAI Bearer token authentication');
-      headers['Authorization'] = `Bearer ${apiKey}`;
-    } else if (backendUrl.includes('anthropic.com')) {
-      // Anthropic uses x-api-key header
-      console.log('AuthHeaders - Using Anthropic x-api-key authentication');
-      headers['x-api-key'] = apiKey;
-      headers['anthropic-version'] = '2023-06-01';
-    } else {
-      // Default to Bearer token for custom backends
-      console.log('AuthHeaders - Using default Bearer token authentication');
-      headers['Authorization'] = `Bearer ${apiKey}`;
-    }
-
-    console.log('AuthHeaders - Final headers:', Object.keys(headers));
-    return headers;
-  }
 
   private displaySuggestions(suggestions: Suggestion[], editor: vscode.TextEditor): void {
     // Display suggestions in the editor

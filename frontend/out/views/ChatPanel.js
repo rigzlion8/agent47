@@ -145,6 +145,7 @@ You can also select code in your editor and ask me about it directly!`,
         this.updateWebview();
     }
     async handleUserMessage(content, codeContext) {
+        console.log('TRACE: handleUserMessage called in ChatPanel.');
         // Check if the message contains file references and handle them
         const fileAnalysisResult = await this.detectAndHandleFileReferences(content, codeContext);
         if (fileAnalysisResult.handled) {
@@ -236,21 +237,51 @@ You can also select code in your editor and ask me about it directly!`,
     }
     extractFileReferences(content) {
         const filePatterns = [
-            // Match file names with extensions
-            /\b(\w+\.(ts|js|tsx|jsx|py|java|cpp|c|cs|php|rb|go|rs|swift|kt|html|css|scss|json|xml|yaml|yml))\b/gi,
-            // Match file paths with extensions
-            /[\w\/\-\.]+\.(ts|js|tsx|jsx|py|java|cpp|c|cs|php|rb|go|rs|swift|kt|html|css|scss|json|xml|yaml|yml)/gi,
+            // Match file paths with extensions (more specific pattern)
+            /(?:^|\s)([\w\/\-\.]+\.[\w]+)/gi,
             // Match quoted file names
-            /["']([^"']+\.[^"']+)["']/gi
+            /["']([^"']+\.[^"']+)["']/gi,
+            // Match file names with common extensions (more specific)
+            /\b(\w+\.[\w]{1,5})\b/gi
         ];
         const references = [];
         for (const pattern of filePatterns) {
             const matches = content.match(pattern);
             if (matches) {
-                references.push(...matches);
+                // Filter out false positives - common words that might match file patterns
+                const filteredMatches = matches.filter(match => {
+                    const cleanMatch = match.trim().replace(/["']/g, '');
+                    // Skip if it's a common word that might match file patterns
+                    const commonFalsePositives = [
+                        'typescript', 'javascript', 'typescript.', 'javascript.',
+                        'python', 'java', 'cpp', 'csharp', 'php', 'ruby', 'go', 'rust',
+                        'swift', 'kotlin', 'html', 'css', 'scss', 'json', 'xml', 'yaml'
+                    ];
+                    if (commonFalsePositives.some(falsePositive => cleanMatch.toLowerCase().includes(falsePositive.toLowerCase()))) {
+                        return false;
+                    }
+                    // Only include if it looks like a real file reference
+                    return this.isLikelyFileReference(cleanMatch);
+                });
+                references.push(...filteredMatches);
             }
         }
         return [...new Set(references)]; // Remove duplicates
+    }
+    isLikelyFileReference(text) {
+        // Skip if it's just a common word or doesn't look like a file
+        if (text.length < 3 || text.length > 100) {
+            return false;
+        }
+        // Check if it has a file extension
+        const hasExtension = /\.[a-zA-Z0-9]{1,5}$/.test(text);
+        if (!hasExtension) {
+            return false;
+        }
+        // Check if it contains path separators or looks like a file path
+        const hasPathSeparators = /[\/\\]/.test(text);
+        const looksLikeFileName = /^[\w\-\.]+\.[\w]+$/.test(text);
+        return hasPathSeparators || looksLikeFileName;
     }
     async resolveFilePath(fileReference) {
         console.log(`=== CHAT PANEL: RESOLVING FILE PATH: "${fileReference}" ===`);
@@ -706,16 +737,15 @@ You can also select code in your editor and ask me about it directly!`,
         this.panel.webview.html = this.getWebviewContent();
     }
     getWebviewContent() {
-        const nonce = getNonce();
-        return `
-      <!DOCTYPE html>
-      <html lang="en">
-      <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' ${this.panel.webview.cspSource}; script-src 'nonce-${nonce}';">
-          <title>AI Assistant</title>
-          <style>
+        const nonce = this.getNonce();
+        return `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' ${this.panel.webview.cspSource}; script-src 'nonce-${nonce}';">
+    <title>AI Assistant</title>
+    <style>
             .header {
               display: flex;
               justify-content: space-between;
@@ -882,58 +912,63 @@ You can also select code in your editor and ask me about it directly!`,
               font-family: var(--vscode-editor-font-family);
               font-size: 0.9em;
             }
-          </style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="header-title">CODE IMPROVER: AI ASSISTANT</div>
-          <div class="header-actions">
-            <button id="settingsButton" class="settings-button" title="Open Settings">
-              ⚙️
-            </button>
-          </div>
-        </div>
-        <div class="chat-container">
-          <div class="messages" id="messages">
-            ${this.messages.map(message => `
-              <div class="message ${message.role}-message ${message.id === 'typing' ? 'typing' : ''}">
-                <div>${this.formatMessageContent(message.content)}</div>
-                ${message.codeContext && message.codeContext.selectedText ? `
-                  <div class="code-context">
-                    📄 Context: ${message.codeContext.filePath ? message.codeContext.filePath.split('/').pop() : 'Current file'}
-                  </div>
-                ` : ''}
-                ${message.id !== 'typing' ? `
-                  <div class="timestamp">
-                    ${message.timestamp.toLocaleTimeString()}
-                  </div>
-                ` : ''}
-              </div>
-            `).join('')}
-          </div>
-          
-          <div class="input-area">
-            <div class="input-container">
-              <textarea
-                id="messageInput"
-                placeholder="Type a message...&#10;(@ to add content, / for commands, hold shift to drag in files)"
-                rows="3"
-              ></textarea>
-              <div class="buttons">
-                <button id="sendButton">Send</button>
-                <button id="clearButton" class="secondary">Clear</button>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        <script nonce="${nonce}">
+   </style>
+</head>
+<body>
+   <div class="header">
+       <div class="header-title">CODE IMPROVER: AI ASSISTANT</div>
+       <div class="header-actions">
+           <button id="settingsButton" class="settings-button" title="Open Settings">
+               ⚙️
+           </button>
+       </div>
+   </div>
+   <div class="chat-container">
+       <div class="messages" id="messages">
+           ${this.messages.map(message => {
+            const messageContent = this.formatMessageContent(this.escapeHtml(message.content));
+            const codeContextHtml = message.codeContext && message.codeContext.selectedText
+                ? `<div class="code-context">
+                    📄 Context: ${this.escapeHtml(message.codeContext.filePath ? message.codeContext.filePath.split('/').pop() || 'Current file' : 'Current file')}
+                  </div>`
+                : '';
+            const timestampHtml = message.id !== 'typing'
+                ? `<div class="timestamp">
+                    ${this.escapeHtml(message.timestamp.toLocaleTimeString())}
+                  </div>`
+                : '';
+            return `<div class="message ${message.role}-message ${message.id === 'typing' ? 'typing' : ''}">
+                       <div>${messageContent}</div>
+                       ${codeContextHtml}
+                       ${timestampHtml}
+                     </div>`;
+        }).join('')}
+       </div>
+       
+       <div class="input-area">
+           <div class="input-container">
+               <textarea
+                   id="messageInput"
+                   placeholder="Type a message...&#10;(@ to add content, / for commands, hold shift to drag in files)"
+                   rows="3"
+               ></textarea>
+               <div class="buttons">
+                   <button id="sendButton">Send</button>
+                   <button id="clearButton" class="secondary">Clear</button>
+               </div>
+           </div>
+       </div>
+   </div>
+   
+   <script nonce="${nonce}">
           const vscode = acquireVsCodeApi();
           const messagesContainer = document.getElementById('messages');
           const messageInput = document.getElementById('messageInput');
           const sendButton = document.getElementById('sendButton');
           const clearButton = document.getElementById('clearButton');
           const settingsButton = document.getElementById('settingsButton');
+         
+          ${ChatPanel.JAVASCRIPT_ESCAPE_FUNCTION.trim()}
           
           // Auto-scroll to bottom
           function scrollToBottom() {
@@ -947,20 +982,19 @@ You can also select code in your editor and ask me about it directly!`,
           
           // Send message
           function sendMessage() {
-            console.log('sendMessage called');
+            console.log('TRACE: sendMessage function called in webview.');
             
             // Double-check that messageInput exists
             if (!messageInput) {
-              console.error('messageInput is null or undefined!');
+              console.error('ERROR: messageInput is null or undefined in webview sendMessage!');
               return;
             }
             
             const content = messageInput.value.trim();
-            console.log('Message content:', content);
-            console.log('Message input value length:', messageInput.value.length);
+            console.log('TRACE: Message content from input:', content);
             
             if (!content) {
-              console.log('Empty message, returning');
+              console.log('INFO: Empty message, not sending.');
               return;
             }
             
@@ -1004,7 +1038,7 @@ You can also select code in your editor and ask me about it directly!`,
                 // Send file content to extension
                 vscode.postMessage({
                   command: 'sendMessage',
-                  content: 'I\\'ve uploaded the file "' + fileName + '". Please analyze this code:\\n\\n' + fileContent,
+                  content: 'I uploaded the file "' + fileName + '". Please analyze this code:\\n\\n' + fileContent,
                   codeContext: {
                     filePath: fileName,
                     language: getLanguageFromExtension(fileName),
@@ -1088,20 +1122,38 @@ You can also select code in your editor and ask me about it directly!`,
           
           // Event listeners
           console.log('Setting up event listeners...');
-          sendButton.addEventListener('click', () => {
-            console.log('Send button clicked');
-            sendMessage();
-          });
-          clearButton.addEventListener('click', () => {
-            console.log('Clear button clicked');
-            clearChat();
-          });
+          
+          // Ensure elements exist before adding listeners
+          if (sendButton) {
+            sendButton.addEventListener('click', (e) => {
+              console.log('TRACE: Send button click event detected.');
+              e.preventDefault();
+              sendMessage();
+            });
+          } else {
+            console.error('Send button not found!');
+          }
+          
+          if (clearButton) {
+            clearButton.addEventListener('click', (e) => {
+              console.log('Clear button clicked');
+              e.preventDefault();
+              clearChat();
+            });
+          } else {
+            console.error('Clear button not found!');
+          }
+          
           if (settingsButton) {
-            settingsButton.addEventListener('click', () => {
+            settingsButton.addEventListener('click', (e) => {
               console.log('Settings button clicked');
+              e.preventDefault();
               openSettings();
             });
+          } else {
+            console.error('Settings button not found!');
           }
+          
           console.log('Event listeners set up successfully');
           
           // Add drag and drop event listeners
@@ -1119,21 +1171,31 @@ You can also select code in your editor and ask me about it directly!`,
           
           messageInput.addEventListener('drop', handleFileDrop);
           
+          // Add Enter key handler for message input
           if (messageInput) {
             messageInput.addEventListener('keydown', (e) => {
-              console.log('Key pressed:', e.key);
-              if (e.key === 'Enter' && !e.shiftKey) {
+              console.log('TRACE: Keydown event detected in message input. Key:', e.key, 'Shift:', e.shiftKey);
+              
+              // Handle Enter key (without Shift for new line)
+              if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
                 e.preventDefault();
-                console.log('Sending message via Enter key...');
+                console.log('TRACE: Enter key pressed to send message.');
                 sendMessage();
-              } else if (e.key === '@') {
-                e.preventDefault();
-                console.log('Opening @ menu...');
-                handleAtMention();
-              } else if (e.key === '/') {
-                e.preventDefault();
-                console.log('Opening / menu...');
-                handleSlashCommand();
+                return;
+              }
+              
+              // Handle @ for content menu
+              if (e.key === '@') {
+                // Don't prevent default - let @ be typed
+                setTimeout(() => handleAtMention(), 10);
+                return;
+              }
+              
+              // Handle / for command menu
+              if (e.key === '/') {
+                // Don't prevent default - let / be typed
+                setTimeout(() => handleSlashCommand(), 10);
+                return;
               }
             });
           } else {
@@ -1163,7 +1225,8 @@ You can also select code in your editor and ask me about it directly!`,
               // Insert content into message input
               if (messageInput) {
                 const currentValue = messageInput.value;
-                messageInput.value = currentValue + '\n' + message.content;
+                const escapedContent = '' + escapeJavaScriptString(message.content);
+                messageInput.value = currentValue + '\\n' + escapedContent;
                 messageInput.style.height = 'auto';
                 messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
                 messageInput.focus();
@@ -1176,10 +1239,9 @@ You can also select code in your editor and ask me about it directly!`,
           
           // Scroll to bottom on load
           scrollToBottom();
-        </script>
-      </body>
-      </html>
-    `;
+   </script>
+</body>
+</html>`;
     }
     async showContentMenu() {
         // Show quick pick for content types
@@ -1287,19 +1349,43 @@ You can also select code in your editor and ask me about it directly!`,
             .replace(/`([^`]+)`/g, '<code>$1</code>')
             .replace(/\n/g, '<br>');
     }
+    escapeHtml(unsafe) {
+        return unsafe
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+    getNonce() {
+        let text = '';
+        const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        for (let i = 0; i < 32; i++) {
+            text += possible.charAt(Math.floor(Math.random() * possible.length));
+        }
+        return text;
+    }
     dispose() {
         ChatPanel.currentPanel = undefined;
         this.panel.dispose();
-        this.disposables.forEach(d => d.dispose());
+        while (this.disposables.length) {
+            const disposable = this.disposables.pop();
+            if (disposable) {
+                disposable.dispose();
+            }
+        }
     }
 }
 exports.ChatPanel = ChatPanel;
-function getNonce() {
-    let text = '';
-    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    for (let i = 0; i < 32; i++) {
-        text += possible.charAt(Math.floor(Math.random() * possible.length));
+ChatPanel.JAVASCRIPT_ESCAPE_FUNCTION = String.raw `
+    function escapeJavaScriptString(unsafe) {
+      return unsafe
+        .replace(/\\/g, '\\\\')
+        .replace(/\'/g, '\\\'')
+        .replace(/\"/g, '\\\"')
+        .replace(/\n/g, '\\n')
+        .replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t');
     }
-    return text;
-}
+  `;
 //# sourceMappingURL=ChatPanel.js.map

@@ -30,6 +30,7 @@ const settingsManager_1 = require("./settingsManager");
 const ChatPanel_1 = require("./views/ChatPanel");
 const ChatService_1 = require("./services/ChatService");
 const ChatViewProvider_1 = require("./views/ChatViewProvider");
+const authUtils_1 = require("./utils/authUtils");
 let codeImprover;
 let chatService;
 function activate(context) {
@@ -215,7 +216,42 @@ function activate(context) {
             }
         }, 100);
     });
-    context.subscriptions.push(analyzeFileCommand, analyzeProjectCommand, openSettingsCommand, openChatCommand, explainCodeCommand, improveCodeCommand, analyzeCodeCommand, readCodeCommand, editCodeCommand, reviewCodeCommand, chatViewDisposable);
+    const validateApiTokenCommand = vscode.commands.registerCommand('code-improver.validateApiToken', async () => {
+        const settingsManager = new settingsManager_1.SettingsManager();
+        const backendUrl = settingsManager.getBackendUrl();
+        const apiKey = settingsManager.getApiKey();
+        if (!apiKey) {
+            vscode.window.showErrorMessage('No API key configured. Please set your API key in the extension settings.', 'Open Settings').then(selection => {
+                if (selection === 'Open Settings') {
+                    vscode.commands.executeCommand('code-improver.openSettings');
+                }
+            });
+            return;
+        }
+        vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: 'Validating API token...',
+            cancellable: false
+        }, async (progress) => {
+            try {
+                const isValid = await authUtils_1.AuthUtils.validateApiToken(backendUrl, apiKey);
+                if (isValid) {
+                    vscode.window.showInformationMessage('✅ API token is valid! Your authentication is working correctly.');
+                }
+                else {
+                    vscode.window.showErrorMessage('❌ API token is invalid or expired. Please check your API key in the extension settings.', 'Open Settings').then(selection => {
+                        if (selection === 'Open Settings') {
+                            vscode.commands.executeCommand('code-improver.openSettings');
+                        }
+                    });
+                }
+            }
+            catch (error) {
+                vscode.window.showErrorMessage(`Token validation failed: ${error.message}`);
+            }
+        });
+    });
+    context.subscriptions.push(analyzeFileCommand, analyzeProjectCommand, openSettingsCommand, openChatCommand, explainCodeCommand, improveCodeCommand, analyzeCodeCommand, readCodeCommand, editCodeCommand, reviewCodeCommand, validateApiTokenCommand, chatViewDisposable);
     // Auto-analyze on save if enabled
     if (settingsManager.getAutoAnalyze()) {
         const saveDisposable = vscode.workspace.onDidSaveTextDocument((document) => {

@@ -54,6 +54,10 @@
       {
         "command": "code-improver.reviewCode",
         "title": "Review Selected Code"
+      },
+      {
+        "command": "code-improver.validateApiToken",
+        "title": "Validate API Token"
       }
     ],
     "configuration": {
@@ -157,11 +161,21 @@
       "code-improver": [
         {
           "id": "code-improver-chat",
-          "name": "AI Assistant",
+          "name": "AI-Assistant",
           "type": "webview"
         }
       ]
-    }
+    },
+    "chatParticipants": [
+      {
+        "id": "code-improver-chat",
+        "name": "AI-Assistant"
+      },
+      {
+        "id": "claude-code",
+        "name": "Claude-Code"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile && npm run build:css",

@@ -67,6 +67,11 @@ export class SettingsWebview {
   }
 
   private getWebviewContent(settings: ExtensionSettings): string {
+    // Get the CSS URI for the webview
+    const cssUri = this.panel.webview.asWebviewUri(
+      vscode.Uri.joinPath(this.panel.webview.asWebviewUri(vscode.Uri.file(__dirname)), '../../out/webview/styles.css')
+    );
+
     return `
       <!DOCTYPE html>
       <html lang="en">
@@ -74,7 +79,7 @@ export class SettingsWebview {
           <meta charset="UTF-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>Code Improver Settings</title>
-          <link rel="stylesheet" href="${this.panel.webview.asWebviewUri(vscode.Uri.joinPath(this.panel.webview.asWebviewUri(vscode.Uri.file(__dirname)), '../../out/webview/styles.css'))}">
+          <link rel="stylesheet" href="${cssUri}">
       </head>
       <body class="bg-vscode-background text-vscode-foreground font-vscode p-6">
         <div class="max-w-4xl mx-auto">

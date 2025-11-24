@@ -1,0 +1,494 @@
+
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' vscode-resource://test; script-src 'nonce-9eXLqcxIIAoamIbxKXta0I6YfBv3JTHf';">
+          <title>AI Assistant</title>
+          <style>
+            .header {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              padding: 12px 16px;
+              border-bottom: 1px solid var(--vscode-panel-border);
+              background: var(--vscode-panel-background);
+            }
+            
+            .header-title {
+              font-weight: bold;
+              font-size: var(--vscode-font-size);
+              color: var(--vscode-foreground);
+            }
+            
+            .settings-button {
+              background: none;
+              border: none;
+              cursor: pointer;
+              font-size: 16px;
+              padding: 4px;
+              border-radius: 4px;
+            }
+            
+            .settings-button:hover {
+              background: var(--vscode-toolbar-hoverBackground);
+            }
+            
+            body {
+              font-family: var(--vscode-font-family);
+              font-size: var(--vscode-font-size);
+              color: var(--vscode-foreground);
+              background-color: var(--vscode-sideBar-background);
+              margin: 0;
+              padding: 0;
+              height: 100vh;
+              display: flex;
+              flex-direction: column;
+            }
+            
+            .chat-container {
+              flex: 1;
+              display: flex;
+              flex-direction: column;
+              height: 100%;
+            }
+            
+            .messages {
+              flex: 1;
+              overflow-y: auto;
+              padding: 16px;
+              display: flex;
+              flex-direction: column;
+              gap: 16px;
+            }
+            
+            .message {
+              max-width: 85%;
+              padding: 12px 16px;
+              border-radius: 8px;
+              line-height: 1.4;
+              word-wrap: break-word;
+            }
+            
+            .user-message {
+              align-self: flex-end;
+              background: var(--vscode-button-background);
+              color: var(--vscode-button-foreground);
+            }
+            
+            .assistant-message {
+              align-self: flex-start;
+              background: var(--vscode-input-background);
+              border: 1px solid var(--vscode-input-border);
+            }
+            
+            .typing {
+              opacity: 0.7;
+              font-style: italic;
+            }
+            
+            .input-area {
+              padding: 16px;
+              border-top: 1px solid var(--vscode-panel-border);
+              background: var(--vscode-panel-background);
+            }
+            
+            .input-container {
+              display: flex;
+              gap: 8px;
+              align-items: flex-end;
+            }
+            
+            textarea {
+              flex: 1;
+              min-height: 60px;
+              max-height: 120px;
+              padding: 8px 12px;
+              border: 1px solid var(--vscode-input-border);
+              background: var(--vscode-input-background);
+              color: var(--vscode-input-foreground);
+              border-radius: 4px;
+              font-family: var(--vscode-font-family);
+              font-size: var(--vscode-font-size);
+              resize: vertical;
+            }
+            
+            textarea:focus {
+              outline: 1px solid var(--vscode-focusBorder);
+            }
+            
+            .buttons {
+              display: flex;
+              gap: 8px;
+            }
+            
+            button {
+              padding: 8px 12px;
+              border: 1px solid var(--vscode-button-border);
+              background: var(--vscode-button-background);
+              color: var(--vscode-button-foreground);
+              border-radius: 4px;
+              cursor: pointer;
+              font-family: var(--vscode-font-family);
+              font-size: var(--vscode-font-size);
+            }
+            
+            button:hover {
+              background: var(--vscode-button-hoverBackground);
+            }
+            
+            button:disabled {
+              opacity: 0.6;
+              cursor: not-allowed;
+            }
+            
+            .secondary {
+              background: transparent;
+              border-color: var(--vscode-button-secondaryBackground);
+            }
+            
+            .code-context {
+              font-size: 0.8em;
+              color: var(--vscode-descriptionForeground);
+              margin-top: 4px;
+            }
+            
+            .timestamp {
+              font-size: 0.7em;
+              color: var(--vscode-descriptionForeground);
+              margin-top: 4px;
+              text-align: right;
+            }
+            
+            pre {
+              background: var(--vscode-textCodeBlock-background);
+              padding: 8px;
+              border-radius: 4px;
+              overflow-x: auto;
+              margin: 8px 0;
+            }
+            
+            code {
+              font-family: var(--vscode-editor-font-family);
+              font-size: 0.9em;
+            }
+          </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="header-title">CODE IMPROVER: AI ASSISTANT</div>
+          <div class="header-actions">
+            <button id="settingsButton" class="settings-button" title="Open Settings">
+              ⚙️
+            </button>
+          </div>
+        </div>
+        <div class="chat-container">
+          <div class="messages" id="messages">
+            <div class="message user-message ">
+                        <div>&lt;/script&gt;</div>
+                        <div class="code-context">
+                    📄 Context: script&gt;
+                  </div>
+                        <div class="timestamp">
+                    3:00:42 PM
+                  </div>
+                      </div>
+          </div>
+          
+          <div class="input-area">
+            <div class="input-container">
+              <textarea
+                id="messageInput"
+                placeholder="Type a message...&#10;(@ to add content, / for commands, hold shift to drag in files)"
+                rows="3"
+              ></textarea>
+              <div class="buttons">
+                <button id="sendButton">Send</button>
+                <button id="clearButton" class="secondary">Clear</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <script nonce="9eXLqcxIIAoamIbxKXta0I6YfBv3JTHf">
+          const vscode = acquireVsCodeApi();
+          const messagesContainer = document.getElementById('messages');
+          const messageInput = document.getElementById('messageInput');
+          const sendButton = document.getElementById('sendButton');
+          const clearButton = document.getElementById('clearButton');
+          const settingsButton = document.getElementById('settingsButton');
+          
+          // Auto-scroll to bottom
+          function scrollToBottom() {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+          }
+          
+          // Get code context from active editor
+          async function getCodeContext() {
+            vscode.postMessage({ command: 'getCodeContext' });
+          }
+          
+          // Send message
+          function sendMessage() {
+            console.log('sendMessage called');
+            
+            // Double-check that messageInput exists
+            if (!messageInput) {
+              console.error('messageInput is null or undefined!');
+              return;
+            }
+            
+            const content = messageInput.value.trim();
+            console.log('Message content:', content);
+            console.log('Message input value length:', messageInput.value.length);
+            
+            if (!content) {
+              console.log('Empty message, returning');
+              return;
+            }
+            
+            // Use stored code context or empty object
+            const codeContext = window.currentCodeContext || {};
+            console.log('Sending message to extension:', content);
+            console.log('Code context:', codeContext);
+            
+            try {
+              vscode.postMessage({
+                command: 'sendMessage',
+                content: content,
+                codeContext: codeContext
+              });
+              console.log('Message posted to vscode successfully');
+            } catch (error) {
+              console.error('Error posting message to vscode:', error);
+            }
+            
+            // Clear input and reset height
+            messageInput.value = '';
+            messageInput.style.height = 'auto';
+            console.log('Message input cleared');
+          }
+
+          // Handle file drag and drop
+          function handleFileDrop(event) {
+            event.preventDefault();
+            messageInput.style.border = '1px solid var(--vscode-input-border)';
+            
+            const files = event.dataTransfer.files;
+            if (files.length > 0) {
+              const file = files[0];
+              
+              // Read the file content
+              const reader = new FileReader();
+              reader.onload = function(e) {
+                const fileContent = e.target.result;
+                const fileName = file.name;
+                
+                // Send file content to extension
+                vscode.postMessage({
+                  command: 'sendMessage',
+                  content: 'I\'ve uploaded the file "' + fileName + '". Please analyze this code:\n\n' + fileContent,
+                  codeContext: {
+                    filePath: fileName,
+                    language: getLanguageFromExtension(fileName),
+                    selectedText: fileContent
+                  }
+                });
+              };
+              
+              reader.readAsText(file);
+            }
+          }
+
+          // Get language from file extension
+          function getLanguageFromExtension(fileName) {
+            const ext = fileName.split('.').pop().toLowerCase();
+            const languageMap = {
+              'js': 'javascript',
+              'ts': 'typescript',
+              'jsx': 'javascript',
+              'tsx': 'typescript',
+              'py': 'python',
+              'java': 'java',
+              'cpp': 'cpp',
+              'c': 'c',
+              'cs': 'csharp',
+              'php': 'php',
+              'rb': 'ruby',
+              'go': 'go',
+              'rs': 'rust',
+              'swift': 'swift',
+              'kt': 'kotlin',
+              'html': 'html',
+              'css': 'css',
+              'scss': 'scss',
+              'json': 'json',
+              'xml': 'xml',
+              'yaml': 'yaml',
+              'yml': 'yaml'
+            };
+            
+            return languageMap[ext] || 'unknown';
+          }
+
+          // Handle @ mentions for content
+          function handleAtMention() {
+            const cursorPos = messageInput.selectionStart;
+            const textBeforeCursor = messageInput.value.substring(0, cursorPos);
+            
+            // Check if user typed @
+            if (textBeforeCursor.endsWith('@')) {
+              // Show content selection menu
+              vscode.postMessage({
+                command: 'showContentMenu'
+              });
+            }
+          }
+
+          // Handle / commands
+          function handleSlashCommand() {
+            const cursorPos = messageInput.selectionStart;
+            const textBeforeCursor = messageInput.value.substring(0, cursorPos);
+            
+            // Check if user typed /
+            if (textBeforeCursor.endsWith('/')) {
+              // Show command menu
+              vscode.postMessage({
+                command: 'showCommandMenu'
+              });
+            }
+          }
+          
+          // Clear chat
+          function clearChat() {
+            vscode.postMessage({ command: 'clearChat' });
+          }
+          
+          // Open settings
+          function openSettings() {
+            vscode.postMessage({ command: 'openSettings' });
+          }
+          
+          // Event listeners
+          console.log('Setting up event listeners...');
+          
+          // Ensure elements exist before adding listeners
+          if (sendButton) {
+            sendButton.addEventListener('click', (e) => {
+              console.log('Send button clicked');
+              e.preventDefault();
+              sendMessage();
+            });
+          } else {
+            console.error('Send button not found!');
+          }
+          
+          if (clearButton) {
+            clearButton.addEventListener('click', (e) => {
+              console.log('Clear button clicked');
+              e.preventDefault();
+              clearChat();
+            });
+          } else {
+            console.error('Clear button not found!');
+          }
+          
+          if (settingsButton) {
+            settingsButton.addEventListener('click', (e) => {
+              console.log('Settings button clicked');
+              e.preventDefault();
+              openSettings();
+            });
+          } else {
+            console.error('Settings button not found!');
+          }
+          
+          console.log('Event listeners set up successfully');
+          
+          // Add drag and drop event listeners
+          messageInput.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            if (e.shiftKey) {
+              messageInput.style.border = '2px dashed var(--vscode-focusBorder)';
+            }
+          });
+          
+          messageInput.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            messageInput.style.border = '1px solid var(--vscode-input-border)';
+          });
+          
+          messageInput.addEventListener('drop', handleFileDrop);
+          
+          if (messageInput) {
+            messageInput.addEventListener('keydown', (e) => {
+              console.log('Key pressed:', e.key, 'Shift:', e.shiftKey, 'Ctrl:', e.ctrlKey, 'Alt:', e.altKey);
+              
+              // Handle Enter key (without Shift for new line)
+              if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
+                e.preventDefault();
+                console.log('Sending message via Enter key...');
+                sendMessage();
+                return;
+              }
+              
+              // Handle @ for content menu
+              if (e.key === '@') {
+                // Don't prevent default - let @ be typed
+                setTimeout(() => handleAtMention(), 10);
+                return;
+              }
+              
+              // Handle / for command menu
+              if (e.key === '/') {
+                // Don't prevent default - let / be typed
+                setTimeout(() => handleSlashCommand(), 10);
+                return;
+              }
+            });
+          } else {
+            console.error('Message input not found!');
+          }
+          
+          messageInput.addEventListener('input', (e) => {
+            // Auto-resize textarea
+            e.target.style.height = 'auto';
+            e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+          });
+          
+          // Auto-focus input
+          if (messageInput) {
+            messageInput.focus();
+          } else {
+            console.error('Cannot focus - message input not found!');
+          }
+          
+          // Listen for code context updates
+          window.addEventListener('message', (event) => {
+            const message = event.data;
+            if (message.command === 'codeContext') {
+              // Store context for next message
+              window.currentCodeContext = message.context;
+            } else if (message.command === 'insertContent') {
+              // Insert content into message input
+              if (messageInput) {
+                const currentValue = messageInput.value;
+                messageInput.value = currentValue + '\n' + message.content;
+                messageInput.style.height = 'auto';
+                messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
+                messageInput.focus();
+              }
+            }
+          });
+          
+          // Get initial code context
+          getCodeContext();
+          
+          // Scroll to bottom on load
+          scrollToBottom();
+        </script>
+      </body>
+      </html>
+    

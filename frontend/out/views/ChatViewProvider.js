@@ -208,21 +208,51 @@ class ChatViewProvider {
     }
     extractFileReferences(content) {
         const filePatterns = [
-            // Match file names with extensions
-            /\b(\w+\.(ts|js|tsx|jsx|py|java|cpp|c|cs|php|rb|go|rs|swift|kt|html|css|scss|json|xml|yaml|yml))\b/gi,
-            // Match file paths with extensions
-            /[\w\/\-\.]+\.(ts|js|tsx|jsx|py|java|cpp|c|cs|php|rb|go|rs|swift|kt|html|css|scss|json|xml|yaml|yml)/gi,
+            // Match file paths with extensions (more specific pattern)
+            /(?:^|\s)([\w\/\-\.]+\.[\w]+)/gi,
             // Match quoted file names
-            /["']([^"']+\.[^"']+)["']/gi
+            /["']([^"']+\.[^"']+)["']/gi,
+            // Match file names with common extensions (more specific)
+            /\b(\w+\.[\w]{1,5})\b/gi
         ];
         const references = [];
         for (const pattern of filePatterns) {
             const matches = content.match(pattern);
             if (matches) {
-                references.push(...matches);
+                // Filter out false positives - common words that might match file patterns
+                const filteredMatches = matches.filter(match => {
+                    const cleanMatch = match.trim().replace(/["']/g, '');
+                    // Skip if it's a common word that might match file patterns
+                    const commonFalsePositives = [
+                        'typescript', 'javascript', 'typescript.', 'javascript.',
+                        'python', 'java', 'cpp', 'csharp', 'php', 'ruby', 'go', 'rust',
+                        'swift', 'kotlin', 'html', 'css', 'scss', 'json', 'xml', 'yaml'
+                    ];
+                    if (commonFalsePositives.some(falsePositive => cleanMatch.toLowerCase().includes(falsePositive.toLowerCase()))) {
+                        return false;
+                    }
+                    // Only include if it looks like a real file reference
+                    return this.isLikelyFileReference(cleanMatch);
+                });
+                references.push(...filteredMatches);
             }
         }
         return [...new Set(references)]; // Remove duplicates
+    }
+    isLikelyFileReference(text) {
+        // Skip if it's just a common word or doesn't look like a file
+        if (text.length < 3 || text.length > 100) {
+            return false;
+        }
+        // Check if it has a file extension
+        const hasExtension = /\.[a-zA-Z0-9]{1,5}$/.test(text);
+        if (!hasExtension) {
+            return false;
+        }
+        // Check if it contains path separators or looks like a file path
+        const hasPathSeparators = /[\/\\]/.test(text);
+        const looksLikeFileName = /^[\w\-\.]+\.[\w]+$/.test(text);
+        return hasPathSeparators || looksLikeFileName;
     }
     async resolveFilePath(fileReference) {
         console.log(`=== RESOLVING FILE PATH: "${fileReference}" ===`);
@@ -887,21 +917,24 @@ You can also select code in your editor and ask me about it directly!`,
         </div>
         <div class="chat-container">
           <div class="messages" id="messages">
-            ${this.messages.map(message => `
-              <div class="message ${message.role}-message ${message.id === 'typing' ? 'typing' : ''}">
-                <div>${this.formatMessageContent(message.content)}</div>
-                ${message.codeContext && message.codeContext.selectedText ? `
-                  <div class="code-context">
-                    📄 Context: ${message.codeContext.filePath ? message.codeContext.filePath.split('/').pop() : 'Current file'}
-                  </div>
-                ` : ''}
-                ${message.id !== 'typing' ? `
-                  <div class="timestamp">
-                    ${message.timestamp.toLocaleTimeString()}
-                  </div>
-                ` : ''}
-              </div>
-            `).join('')}
+            ${this.messages.map(message => {
+            const messageContent = this.formatMessageContent(message.content);
+            const codeContextHtml = message.codeContext && message.codeContext.selectedText
+                ? `<div class="code-context">
+                    📄 Context: ${this.escapeHtml(message.codeContext.filePath ? message.codeContext.filePath.split('/').pop() || 'Current file' : 'Current file')}
+                  </div>`
+                : '';
+            const timestampHtml = message.id !== 'typing'
+                ? `<div class="timestamp">
+                    ${this.escapeHtml(message.timestamp.toLocaleTimeString())}
+                  </div>`
+                : '';
+            return `<div class="message ${message.role}-message ${message.id === 'typing' ? 'typing' : ''}">
+                        <div>${messageContent}</div>
+                        ${codeContextHtml}
+                        ${timestampHtml}
+                      </div>`;
+        }).join('')}
           </div>
           
           <div class="input-area">
@@ -1131,19 +1164,28 @@ You can also select code in your editor and ask me about it directly!`,
           
           if (messageInput) {
             messageInput.addEventListener('keydown', (e) => {
-              console.log('Key pressed:', e.key);
-              if (e.key === 'Enter' && !e.shiftKey) {
+              console.log('Key pressed:', e.key, 'Shift:', e.shiftKey, 'Ctrl:', e.ctrlKey, 'Alt:', e.altKey);
+              
+              // Handle Enter key (without Shift for new line)
+              if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey) {
                 e.preventDefault();
                 console.log('Sending message via Enter key...');
                 sendMessage();
-              } else if (e.key === '@') {
-                e.preventDefault();
-                console.log('Opening @ menu...');
-                handleAtMention();
-              } else if (e.key === '/') {
-                e.preventDefault();
-                console.log('Opening / menu...');
-                handleSlashCommand();
+                return;
+              }
+              
+              // Handle @ for content menu
+              if (e.key === '@') {
+                // Don't prevent default - let @ be typed
+                setTimeout(() => handleAtMention(), 10);
+                return;
+              }
+              
+              // Handle / for command menu
+              if (e.key === '/') {
+                // Don't prevent default - let / be typed
+                setTimeout(() => handleSlashCommand(), 10);
+                return;
               }
             });
           } else {
@@ -1173,7 +1215,7 @@ You can also select code in your editor and ask me about it directly!`,
               // Insert content into message input
               if (messageInput) {
                 const currentValue = messageInput.value;
-                messageInput.value = currentValue + '\n' + message.content;
+                messageInput.value = currentValue + '\\n' + message.content;
                 messageInput.style.height = 'auto';
                 messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + 'px';
                 messageInput.focus();
@@ -1292,9 +1334,17 @@ You can also select code in your editor and ask me about it directly!`,
             });
         }
     }
+    escapeHtml(unsafe) {
+        return unsafe
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
     formatMessageContent(content) {
         // Simple markdown-like formatting for code blocks
-        return content
+        return this.escapeHtml(content)
             .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
             .replace(/`([^`]+)`/g, '<code>$1</code>')
             .replace(/\n/g, '<br>');

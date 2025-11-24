@@ -1,6 +1,8 @@
+
 import * as vscode from 'vscode';
 import axios from '../utils/axiosConfig';
 import { SettingsManager } from '../settingsManager';
+import { AuthUtils } from '../utils/authUtils';
 
 export interface ChatContext {
   filePath?: string;
@@ -64,85 +66,87 @@ export class ChatService {
 
     if (!apiKey) {
       console.warn('API key not configured. Some features may not work properly.');
-      // Continue without API key for now
+      // For development, allow requests without API key to local backends
+      if (!backendUrl.includes('localhost') && !backendUrl.includes('127.0.0.1')) {
+        throw new Error('API key is required for external backend services. Please configure your API key in the extension settings.');
+      }
     }
 
-    try {
-      // Get additional context from active editor if available
-      const editorContext = await this.getEditorContext();
-      const fullContext = { ...context, ...editorContext };
+    // Get additional context from active editor if available
+    const editorContext = await this.getEditorContext();
+    const fullContext = { ...context, ...editorContext };
 
-      const headers = this.getAuthHeaders(backendUrl, apiKey);
-      
-      // Use appropriate endpoint based on backend URL
-      let endpoint;
-      if (backendUrl.includes('generativelanguage.googleapis.com')) {
-        endpoint = `${backendUrl}/models/${this.settingsManager.getModel()}:generateContent?key=${apiKey}`;
-      } else if (backendUrl.includes('deepseek.com')) {
-        endpoint = `${backendUrl}/chat/completions`;
-      } else {
-        endpoint = `${backendUrl}/api/code/analyze`;
-      }
-      
-      let payload;
-      if (backendUrl.includes('generativelanguage.googleapis.com')) {
-        payload = {
-          contents: [
-            {
-              parts: [
-                {
-                  text: `You are a helpful AI assistant that provides code analysis, suggestions, and improvements. Focus on performance, readability, and best practices. Please analyze this ${fullContext.language || 'typescript'} code:\n\n${message}\n\nProvide code analysis, suggestions, and improvements.`
-                }
-              ]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 1000
+    const headers = AuthUtils.getAuthHeaders(backendUrl, apiKey);
+    
+    // Use appropriate requestEndpoint based on backend URL
+    let requestEndpoint;
+    if (backendUrl.includes('generativelanguage.googleapis.com')) {
+      requestEndpoint = `${backendUrl}/models/${this.settingsManager.getModel()}:generateContent?key=${apiKey}`;
+    } else if (backendUrl.includes('deepseek.com')) {
+      requestEndpoint = `${backendUrl}/chat/completions`;
+    } else {
+      requestEndpoint = `${backendUrl}/api/code/analyze`;
+    }
+    
+    let payload;
+    if (backendUrl.includes('generativelanguage.googleapis.com')) {
+      payload = {
+        contents: [
+          {
+            parts: [
+              {
+                text: `You are a helpful AI assistant that provides code analysis, suggestions, and improvements. Focus on performance, readability, and best practices. Please analyze this ${fullContext.language || 'typescript'} code:\n\n${message}\n\nProvide code analysis, suggestions, and improvements.`
+              }
+            ]
           }
-        };
-      } else if (backendUrl.includes('deepseek.com')) {
-        payload = {
-          model: this.settingsManager.getModel(),
-          messages: [
-            {
-              role: "user",
-              content: `You are a helpful AI assistant that provides code analysis, suggestions, and improvements. Focus on performance, readability, and best practices. Please analyze this ${fullContext.language || 'typescript'} code:\n\n${message}\n\nProvide code analysis, suggestions, and improvements.`
-            }
-          ],
+        ],
+        generationConfig: {
           temperature: 0.1,
-          max_tokens: 1000
-        };
-      } else {
-        payload = {
-          code: message,
-          language: fullContext.language || 'typescript',
-          filePath: fullContext.filePath,
-          context: fullContext
-        };
-      }
+          maxOutputTokens: 1000
+        }
+      };
+    } else if (backendUrl.includes('deepseek.com')) {
+      payload = {
+        model: this.settingsManager.getModel(),
+        messages: [
+          {
+            role: "user",
+            content: `You are a helpful AI assistant that provides code analysis, suggestions, and improvements. Focus on performance, readability, and best practices. Please analyze this ${fullContext.language || 'typescript'} code:\n\n${message}\n\nProvide code analysis, suggestions, and improvements.`
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 1000
+      };
+    } else {
+      payload = {
+        code: message,
+        language: fullContext.language || 'typescript',
+        filePath: fullContext.filePath,
+        context: fullContext
+      };
+    }
 
-      console.log(`=== MAKING REQUEST TO BACKEND ===`);
-      console.log('Endpoint:', endpoint);
-      console.log('Headers:', Object.keys(headers));
-      console.log('Payload keys:', Object.keys(payload));
-      console.log('Model:', this.settingsManager.getModel());
-      console.log('Timeout: 30 seconds');
+    console.log(`=== MAKING REQUEST TO BACKEND ===`);
+    console.log('Endpoint:', requestEndpoint);
+    console.log('Headers:', Object.keys(headers));
+    console.log('Payload keys:', Object.keys(payload));
+    console.log('Model:', this.settingsManager.getModel());
+    console.log('Timeout: 30 seconds');
 
-      // Create axios instance with better timeout and cancellation handling
-      const source = axios.CancelToken.source();
-      const timeout = setTimeout(() => {
-        source.cancel('Request timeout after 30 seconds');
-      }, 30000);
+    // Create axios instance with better timeout and cancellation handling
+    const source = axios.CancelToken.source();
+    const timeout = setTimeout(() => {
+      source.cancel('Request timeout after 30 seconds');
+    }, 30000);
 
-      try {
-        const response = await axios.post(endpoint, payload, {
-          headers,
-          cancelToken: source.token,
-          timeout: 30000 // 30 second timeout
-        });
+    try {
+      const response = await axios.post(requestEndpoint, payload, {
+        headers,
+        cancelToken: source.token,
+        timeout: 30000 // 30 second timeout
+      });
 
-        clearTimeout(timeout);
+      clearTimeout(timeout);
 
       console.log(`=== BACKEND RESPONSE RECEIVED ===`);
       console.log('Response status:', response.status);
@@ -178,11 +182,9 @@ export class ChatService {
           throw new Error('Invalid response format from analysis service');
         }
       }
-      } catch (error: any) {
-        clearTimeout(timeout);
-        throw error;
-      }
     } catch (error: any) {
+      clearTimeout(timeout);
+      
       console.error(`=== BACKEND REQUEST ERROR (Attempt ${attempt}) ===`);
       console.error('Error type:', error.constructor.name);
       console.error('Error message:', error.message);
@@ -199,13 +201,14 @@ export class ChatService {
       if (error.code === 'ECONNREFUSED') {
         throw new Error('Unable to connect to the analysis service. Please check if the backend server is running.');
       } else if (error.response?.status === 401) {
-        // Authentication error - provide a helpful message with guidance
-        return "I can see the backend server is running, but authentication is required. Please configure your API key in the Code Improver settings:\n\n1. Open Command Palette (Ctrl+Shift+P / Cmd+Shift+P)\n2. Search for 'Code Improver: Open Settings'\n3. Enter your API key in the 'API Key' field\n4. Save the settings\n\nFor development, you might need to set up authentication or use a development API key.";
+        console.error('Authentication failed: Invalid or expired API token');
+        AuthUtils.showAuthError();
+        throw new Error('Authentication failed: Invalid or expired API token');
       } else if (error.response?.status === 402) {
         // Payment required - Eden AI account may need credits
         return "Your Eden AI account requires payment or credits to use this service. Please check your account balance at https://app.edenai.run/admin/billing and ensure you have sufficient credits for text generation services.";
       } else if (error.response?.status === 404) {
-        throw new Error('Analysis endpoint not found. Please check the backend configuration.');
+        throw new Error('Analysis requestEndpoint not found. Please check the backend configuration.');
       } else if (error.response?.status === 429) {
         throw new Error('Rate limit exceeded. Please try again later.');
       } else if (error.response?.data?.error) {
@@ -220,6 +223,8 @@ export class ChatService {
         }
       } else if (error.message?.includes('aborted') || error.message?.includes('cancel')) {
         throw new Error('Request was cancelled. This might be due to network issues or timeout. Please try again.');
+      } else if (error.message?.includes('fetch failed') || error.code === 'ENOTFOUND') {
+        throw new Error(`Cannot connect to the backend server at ${backendUrl}. Please check if the server is running and the URL is correct.`);
       } else {
         throw new Error(`Failed to send message: ${error.message}`);
       }
@@ -489,52 +494,6 @@ export class ChatService {
     }
   }
 
-  private getAuthHeaders(backendUrl: string, apiKey: string | undefined): Record<string, string> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    };
-
-    if (!apiKey) {
-      console.warn('No API key provided for authentication');
-      return headers;
-    }
-
-    // Debug logging for authentication
-    console.log('AuthHeaders - Backend URL:', backendUrl);
-    console.log('AuthHeaders - API Key length:', apiKey.length);
-
-    // Handle different authentication schemes based on backend URL
-    if (backendUrl.includes('generativelanguage.googleapis.com')) {
-      // Google Gemini uses query parameter for API key
-      console.log('AuthHeaders - Using Google Gemini API key authentication');
-      // Note: Google Gemini API key is typically passed as a query parameter, not header
-      // We'll handle this in the endpoint URL construction
-    } else if (backendUrl.includes('deepseek.com')) {
-      // DeepSeek uses standard Authorization header with Bearer token
-      console.log('AuthHeaders - Using DeepSeek Bearer token authentication');
-      headers['Authorization'] = `Bearer ${apiKey}`;
-    } else if (backendUrl.includes('edenai.run') || backendUrl.includes('edenai')) {
-      // Eden AI uses lowercase 'authorization' header for JavaScript/Node.js
-      console.log('AuthHeaders - Using Eden AI Bearer token authentication (lowercase header)');
-      headers['authorization'] = `Bearer ${apiKey}`;
-    } else if (backendUrl.includes('openai.com')) {
-      // OpenAI uses Bearer tokens
-      console.log('AuthHeaders - Using OpenAI Bearer token authentication');
-      headers['Authorization'] = `Bearer ${apiKey}`;
-    } else if (backendUrl.includes('anthropic.com')) {
-      // Anthropic uses x-api-key header
-      console.log('AuthHeaders - Using Anthropic x-api-key authentication');
-      headers['x-api-key'] = apiKey;
-      headers['anthropic-version'] = '2023-06-01';
-    } else {
-      // Default to Bearer token for custom backends
-      console.log('AuthHeaders - Using default Bearer token authentication');
-      headers['Authorization'] = `Bearer ${apiKey}`;
-    }
-
-    console.log('AuthHeaders - Final headers:', Object.keys(headers));
-    return headers;
-  }
 
   private isRetryableError(error: any): boolean {
     // Retry on network errors, timeouts, and server errors (5xx)

@@ -4,6 +4,7 @@ import { SettingsManager } from './settingsManager';
 import { ChatPanel } from './views/ChatPanel';
 import { ChatService } from './services/ChatService';
 import { ChatViewProvider } from './views/ChatViewProvider';
+import { AuthUtils } from './utils/authUtils';
 
 let codeImprover: CodeImprover;
 let chatService: ChatService;
@@ -283,6 +284,46 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
+  const validateApiTokenCommand = vscode.commands.registerCommand(
+    'code-improver.validateApiToken',
+    async () => {
+      const settingsManager = new SettingsManager();
+      const backendUrl = settingsManager.getBackendUrl();
+      const apiKey = settingsManager.getApiKey();
+
+      if (!apiKey) {
+        vscode.window.showErrorMessage('No API key configured. Please set your API key in the extension settings.', 'Open Settings').then(selection => {
+          if (selection === 'Open Settings') {
+            vscode.commands.executeCommand('code-improver.openSettings');
+          }
+        });
+        return;
+      }
+
+      vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: 'Validating API token...',
+        cancellable: false
+      }, async (progress) => {
+        try {
+          const isValid = await AuthUtils.validateApiToken(backendUrl, apiKey);
+          
+          if (isValid) {
+            vscode.window.showInformationMessage('✅ API token is valid! Your authentication is working correctly.');
+          } else {
+            vscode.window.showErrorMessage('❌ API token is invalid or expired. Please check your API key in the extension settings.', 'Open Settings').then(selection => {
+              if (selection === 'Open Settings') {
+                vscode.commands.executeCommand('code-improver.openSettings');
+              }
+            });
+          }
+        } catch (error: any) {
+          vscode.window.showErrorMessage(`Token validation failed: ${error.message}`);
+        }
+      });
+    }
+  );
+
   context.subscriptions.push(
     analyzeFileCommand,
     analyzeProjectCommand,
@@ -294,6 +335,7 @@ export function activate(context: vscode.ExtensionContext) {
     readCodeCommand,
     editCodeCommand,
     reviewCodeCommand,
+    validateApiTokenCommand,
     chatViewDisposable
   );
 
