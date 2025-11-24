@@ -4,6 +4,7 @@ exports.AnalysisQueue = void 0;
 const CodeAnalysis_1 = require("../models/CodeAnalysis");
 const User_1 = require("../models/User");
 const openRouterService_1 = require("./openRouterService");
+const deepseekService_1 = require("./deepseekService");
 class AnalysisQueue {
     constructor() {
         this.queue = [];
@@ -53,13 +54,13 @@ class AnalysisQueue {
             if (!user) {
                 throw new Error('User not found');
             }
-            const apiKey = user.apiKey || process.env.OPENROUTER_API_KEY;
-            if (!apiKey) {
+            const deepseekKey = process.env.DEEPSEEK_API_KEY;
+            const openRouterKey = user.apiKey || process.env.OPENROUTER_API_KEY;
+            if (!deepseekKey && !openRouterKey) {
                 throw new Error('No API key available');
             }
-            const openRouterService = new openRouterService_1.OpenRouterService(apiKey);
+            const suggestions = await this.runProvidersInOrder(request, deepseekKey, openRouterKey);
             const startTime = Date.now();
-            const suggestions = await openRouterService.analyzeCode(request);
             const analysisTime = Date.now() - startTime;
             await CodeAnalysis_1.CodeAnalysis.findByIdAndUpdate(analysisId, {
                 status: 'completed',
@@ -86,6 +87,22 @@ class AnalysisQueue {
                 });
             }
         }
+    }
+    async runProvidersInOrder(request, deepseekKey, openRouterKey) {
+        if (deepseekKey) {
+            try {
+                const deepseekService = new deepseekService_1.DeepseekService(deepseekKey);
+                return await deepseekService.analyzeCode(request);
+            }
+            catch (error) {
+                console.warn('DeepSeek provider failed, falling back to OpenRouter if available:', error);
+            }
+        }
+        if (openRouterKey) {
+            const openRouterService = new openRouterService_1.OpenRouterService(openRouterKey);
+            return openRouterService.analyzeCode(request);
+        }
+        throw new Error('No analysis providers available');
     }
     getQueueStatus() {
         return {

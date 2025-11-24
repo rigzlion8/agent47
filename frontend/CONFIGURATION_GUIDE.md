@@ -24,11 +24,15 @@ Your extension is configured to use:
    - Backend URL: `http://localhost:3006`
    - API Key: *(leave blank)*
 
-### Option 2: Use DeepSeek API
-1. Get API key from [DeepSeek](https://platform.deepseek.com/)
-2. Update settings in VS Code:
-   - Backend URL: `https://api.deepseek.com/v1`
-   - API Key: Your DeepSeek API key
+### Option 2: Use DeepSeek API (backend-managed)
+1. Get an API key from [DeepSeek](https://platform.deepseek.com/).
+2. Add the key to `backend/.env`:
+   ```
+   DEEPSEEK_API_KEY=sk-...
+   # Optional: override model
+   # DEEPSEEK_MODEL=deepseek-chat
+   ```
+3. Restart the backend (`npm run dev` or `npm run start`). The queue will prefer DeepSeek directly and fall back to OpenRouter (`OPENROUTER_API_KEY`) if DeepSeek isn’t configured.
 
 ### Option 3: Use Other AI Services
 The extension supports:

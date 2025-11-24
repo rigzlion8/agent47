@@ -1,7 +1,8 @@
 import { CodeAnalysis } from '../models/CodeAnalysis';
 import { User } from '../models/User';
 import { OpenRouterService } from './openRouterService';
-import { AnalysisRequest } from '../types/shared';
+import { DeepseekService } from './deepseekService';
+import { AnalysisRequest, Suggestion } from '../types/shared';
 
 interface QueueItem {
   analysisId: string;
@@ -68,21 +69,20 @@ export class AnalysisQueue {
       // Update status to processing
       await CodeAnalysis.findByIdAndUpdate(analysisId, { status: 'processing' });
 
-      // Get user's API key or use system default
       const user = await User.findById(request.userId);
       if (!user) {
         throw new Error('User not found');
       }
 
-      const apiKey = user.apiKey || process.env.OPENROUTER_API_KEY;
-      if (!apiKey) {
+      const deepseekKey = process.env.DEEPSEEK_API_KEY;
+      const openRouterKey = user.apiKey || process.env.OPENROUTER_API_KEY;
+
+      if (!deepseekKey && !openRouterKey) {
         throw new Error('No API key available');
       }
 
-      const openRouterService = new OpenRouterService(apiKey);
-      
+      const suggestions = await this.runProvidersInOrder(request, deepseekKey, openRouterKey);
       const startTime = Date.now();
-      const suggestions = await openRouterService.analyzeCode(request);
       const analysisTime = Date.now() - startTime;
 
       // Update analysis with results
@@ -114,6 +114,28 @@ export class AnalysisQueue {
         });
       }
     }
+  }
+
+  private async runProvidersInOrder(
+    request: AnalysisRequest,
+    deepseekKey?: string,
+    openRouterKey?: string
+  ): Promise<Suggestion[]> {
+    if (deepseekKey) {
+      try {
+        const deepseekService = new DeepseekService(deepseekKey);
+        return await deepseekService.analyzeCode(request);
+      } catch (error) {
+        console.warn('DeepSeek provider failed, falling back to OpenRouter if available:', error);
+      }
+    }
+
+    if (openRouterKey) {
+      const openRouterService = new OpenRouterService(openRouterKey);
+      return openRouterService.analyzeCode(request);
+    }
+
+    throw new Error('No analysis providers available');
   }
 
   getQueueStatus() {
