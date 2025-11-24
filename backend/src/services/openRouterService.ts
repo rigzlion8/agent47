@@ -16,7 +16,7 @@ export class OpenRouterService {
       const response = await axios.post(
         `${this.baseURL}/chat/completions`,
         {
-          model: 'anthropic/claude-2',
+          model: 'deepseek/deepseek-chat',
           messages: [
             {
               role: 'system',

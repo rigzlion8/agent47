@@ -14,7 +14,7 @@ class OpenRouterService {
         const prompt = this.buildAnalysisPrompt(request);
         try {
             const response = await axios_1.default.post(`${this.baseURL}/chat/completions`, {
-                model: 'anthropic/claude-2',
+                model: 'deepseek/deepseek-chat',
                 messages: [
                     {
                         role: 'system',

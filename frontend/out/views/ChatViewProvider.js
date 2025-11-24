@@ -257,8 +257,11 @@ class ChatViewProvider {
     async resolveFilePath(fileReference) {
         console.log(`=== RESOLVING FILE PATH: "${fileReference}" ===`);
         try {
-            // Clean the file reference (remove quotes, etc.)
-            const cleanReference = fileReference.replace(/["']/g, '');
+            const cleanReference = this.sanitizeFileReference(fileReference);
+            if (!cleanReference) {
+                console.log('Sanitized reference is empty');
+                return null;
+            }
             console.log(`Cleaned reference: "${cleanReference}"`);
             // Check if it's an absolute path
             if (cleanReference.startsWith('/') || cleanReference.includes(':\\')) {
@@ -288,6 +291,11 @@ class ChatViewProvider {
                     console.log(`Resolved file path: ${resolvedPath}`);
                     return resolvedPath;
                 }
+            }
+            const fallbackPath = await this.findFileCaseInsensitive(cleanReference, workspaceFolders);
+            if (fallbackPath) {
+                console.log(`Case-insensitive match found: ${fallbackPath}`);
+                return fallbackPath;
             }
             // Check if it's the current active file
             const editor = vscode.window.activeTextEditor;
@@ -320,6 +328,27 @@ class ChatViewProvider {
             console.error('Error resolving file path:', error);
             return null;
         }
+    }
+    sanitizeFileReference(fileReference) {
+        return fileReference
+            .replace(/["'`]/g, '')
+            .trim()
+            .replace(/^[^A-Za-z0-9./\\_-]+/, '')
+            .replace(/[^A-Za-z0-9._/\\-]+$/, '');
+    }
+    async findFileCaseInsensitive(reference, workspaceFolders) {
+        const path = require('path');
+        const lowerReference = reference.toLowerCase();
+        for (const folder of workspaceFolders) {
+            const files = await vscode.workspace.findFiles(new vscode.RelativePattern(folder, '**/*'), undefined, 2000);
+            for (const file of files) {
+                const relativePath = path.relative(folder.uri.fsPath, file.fsPath).replace(/\\/g, '/').toLowerCase();
+                if (relativePath.endsWith(lowerReference)) {
+                    return file.fsPath;
+                }
+            }
+        }
+        return null;
     }
     determineOperationType(content) {
         const lowerContent = content.toLowerCase();

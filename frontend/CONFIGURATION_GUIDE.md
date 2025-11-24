@@ -19,10 +19,10 @@ Your extension is configured to use:
 
 ### Option 1: Use Local Backend (Recommended for Development)
 1. Set up your local backend server
-2. Configure authentication token
+2. Run it with `npm run dev` (no auth setup needed; the backend now auto-creates a shared dev user)
 3. Update settings in VS Code:
    - Backend URL: `http://localhost:3006`
-   - API Key: Your backend authentication token
+   - API Key: *(leave blank)*
 
 ### Option 2: Use DeepSeek API
 1. Get API key from [DeepSeek](https://platform.deepseek.com/)

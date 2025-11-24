@@ -83,6 +83,12 @@ const codeAnalysisSchema = new Schema<ICodeAnalysis>({
 // Indexes for faster queries
 codeAnalysisSchema.index({ userId: 1, createdAt: -1 });
 codeAnalysisSchema.index({ status: 1 });
-codeAnalysisSchema.index({ fileName: 'text', filePath: 'text' });
+codeAnalysisSchema.index(
+  { fileName: 'text', filePath: 'text' },
+  {
+    default_language: 'none',
+    language_override: 'code_improver_language_override'
+  }
+);
 
 export const CodeAnalysis = mongoose.model<ICodeAnalysis>('CodeAnalysis', codeAnalysisSchema);
